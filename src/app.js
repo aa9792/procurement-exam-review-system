@@ -141,6 +141,105 @@ function extractKeywords(question) {
   return [...new Set([...found, ...numbers])].slice(0, 6);
 }
 
+function choiceIntent(question) {
+  const stem = question.stem || question.raw || "";
+  if (/不包含|不包括|非屬|何者非|何者不是|非為|除外/.test(stem)) {
+    return {
+      type: "exclude",
+      label: "找出不屬於題目所列範圍的選項",
+      why: "題目用的是排除式問法，所以答案要選「不在規定範圍內」的那一項。",
+    };
+  }
+  if (/錯誤|不正確|有誤|不適法|不合法|無效|不得/.test(stem)) {
+    return {
+      type: "false",
+      label: "找出錯誤或不適法的敘述",
+      why: "題目是在問錯誤選項，因此標準答案代表該敘述和法規、程序或題庫基準不一致。",
+    };
+  }
+  if (/正確|何者為是|適法|合法|有效|得為|應為/.test(stem)) {
+    return {
+      type: "true",
+      label: "找出正確或最適法的敘述",
+      why: "題目是在問正確選項，因此標準答案代表該敘述最符合規定或題意。",
+    };
+  }
+  return {
+    type: "best",
+    label: "找出最符合題意的選項",
+    why: "題目沒有明顯的正反問法，需依關鍵字、程序階段與選項內容判斷最符合題意者。",
+  };
+}
+
+function optionList(question) {
+  return (question.options || []).map((option, index) => ({
+    number: String(index + 1),
+    text: option,
+    label: `(${index + 1}) ${option}`,
+  }));
+}
+
+function chapterHint(question) {
+  const chart = window.CHAPTER_CHARTS?.[question.subjectId];
+  if (!chart) return "";
+  const text = `${question.stem} ${question.raw}`;
+  const hit = chart.memory.find((item) => text.includes(item.replace(/[/%]/g, "")) || text.includes(item));
+  if (hit) return `本題可放在「${hit}」這個記憶點下複習。`;
+  return `可回到「${chart.flowTitle}」檢查這題所在的程序位置。`;
+}
+
+function specificChoiceReason(question) {
+  if (
+    question.subjectId === "01" &&
+    question.stem.includes("共同性費用編列基準") &&
+    question.stem.includes("專案研析後得計列")
+  ) {
+    return "依共同性費用編列基準，專案研析後得計列的項目包含「綠建築、挑高空間、智慧建築」；「基地一般性整理」不是這一類專案研析後加列項目。題目問「不包含」，所以答案是 (1)。";
+  }
+  return "";
+}
+
+function relatedQuestionHint(question, anchorText) {
+  const candidates = QUESTIONS.filter(
+    (item) => item.id !== question.id && item.subjectId === question.subjectId
+  )
+    .map((item) => ({ item, score: similarity(anchorText, `${item.stem} ${item.raw}`) }))
+    .filter((entry) => entry.score >= 0.28)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 2);
+  if (!candidates.length) return "";
+  return `延伸對照：同科第 ${candidates.map((entry) => `${entry.item.number} 題`).join("、第 ")} 也有相近概念，可用來交叉複習。`;
+}
+
+function choiceExplanation(question) {
+  const intent = choiceIntent(question);
+  const options = optionList(question);
+  const correct = options.find((option) => option.number === question.answer);
+  const others = options.filter((option) => option.number !== question.answer);
+  const specific = specificChoiceReason(question);
+  const contrast =
+    intent.type === "exclude"
+      ? `其餘選項 ${others.map((option) => `(${option.number})`).join("、")} 在本題語境下屬於題目所問的範圍；${correct.label} 才是不包含的項目。`
+      : intent.type === "false"
+        ? `其餘選項 ${others.map((option) => `(${option.number})`).join("、")} 在本題語境下較符合規定；${correct.label} 才是題目要找的錯誤敘述。`
+        : intent.type === "true"
+          ? `${correct.label} 是最符合規定或題意的敘述；其餘選項在本題語境下有不完整、不適用或程序效果錯置的問題。`
+          : `${correct.label} 最符合題幹條件；其餘選項不是本題要找的最佳答案。`;
+  const basis = specific || `${intent.why}${contrast}`;
+  const keywords = extractKeywords(question);
+  const keywordText = keywords.length ? `判斷時抓這些字：${keywords.join("、")}。` : chapterHint(question);
+  const related = relatedQuestionHint(question, `${question.stem} ${correct?.text || ""}`);
+  return [
+    `題目問法：${intent.label}。`,
+    `正確選項：${correct?.label || answerText(question)}`,
+    `為什麼：${basis}`,
+    keywordText,
+    related,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 function compactText(value) {
   return String(value || "").replace(/[\s，。；：、（）()「」『』,.!?！？;:]/g, "");
 }
@@ -236,12 +335,13 @@ function findTrueFalseCorrection(question) {
 
 function explanation(question, chosen) {
   const correct = answerText(question);
+  const correctSentence = /[。！？.!?]$/.test(correct) ? correct : `${correct}。`;
   const keywords = extractKeywords(question);
   const chosenText = chosen ? (question.type === "choice" ? `(${chosen})` : chosen) : "未作答";
   const focus = keywords.length ? `本題判斷點：${keywords.join("、")}。` : "本題重點在題幹敘述與標準答案的差異。";
   const source = `來源：${question.source}，${question.subject}第 ${question.number} 題。`;
   if (question.type === "choice") {
-    return `你選 ${chosenText}，題庫標準答案是 ${correct}。${focus}選擇題建議把正確選項整句記下來，再回頭比較其他選項被改動的期限、金額、程序或效力。${source}`;
+    return `你選 ${chosenText}，題庫標準答案是 ${correctSentence}\n${choiceExplanation(question)}\n${source}`;
   }
   const correction = findTrueFalseCorrection(question);
   return `你選 ${chosenText}，題庫標準答案是 ${correct}。${focus}${correction.text}${source}`;
