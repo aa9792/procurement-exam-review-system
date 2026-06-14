@@ -2,6 +2,68 @@ const DATA = window.EXAM_DATA;
 const QUESTIONS = DATA.questions;
 const SUBJECTS = DATA.subjects;
 const STORAGE_KEY = "procurement-exam-progress-v1";
+const TF_EXPLANATION_OVERRIDES = {
+  "01-tf-0002": {
+    topic: "工程採購契約範本的物價調整機制",
+    wrong: "「招標文件並納入總指數漲跌幅調整契約價金之內容即符合主管機關之工程採購契約範本」",
+    fix: "應改為：招標文件採用工程採購契約範本時，物價調整應納入個別項目、中分類項目及總指數等三層級機制，以反映物價變動。",
+    why: "前半段「招標時檢核設計預算是否符合市場行情並作必要調整」是正確觀念；錯在後半段把物價調整簡化成只看總指數。講義在招標決標階段寫的是採用工程採購契約範本，應納入個別項目、中分類項目及總指數辦理物價調整，不是只放總指數漲跌幅就算符合。",
+    review: "複習時記成：物調不是單一總指數，而是三層級物調。看到「只要、即符合、免、僅」這類絕對化字眼要特別小心。",
+  },
+};
+
+const REVIEW_RULES = [
+  {
+    match: /物價調整|總指數|工程採購契約範本|市場行情|設計預算/,
+    topic: "物價調整與招標前預算檢核",
+    explain: "工程採購在招標前要檢核預算是否仍符合市場行情；採工程採購契約範本時，物價調整重點是個別項目、中分類項目及總指數等三層級機制。若題幹說只用總指數、免檢核市場行情、或要求廠商放棄物調，通常就是錯誤方向。",
+  },
+  {
+    match: /全生命週期|工程、財物及勞務|技術服務及工程/,
+    topic: "政府採購全生命週期適用範圍",
+    explain: "政府採購全生命週期概念可適用於工程、財物及勞務採購，不限於工程或技術服務。題幹若出現「僅適用」或排除財物、勞務，通常是把適用範圍縮得太窄。",
+  },
+  {
+    match: /規劃設計階段|預算範圍|工法可行性|工期合理性|可先不考量預算/,
+    topic: "規劃設計階段檢核",
+    explain: "規劃設計階段要檢查工程定位、預算範圍、工法可行性及工期合理性。若題幹說可先不考量預算，會讓後續招標、履約產生風險，因此是錯誤敘述。",
+  },
+  {
+    match: /多次流標|量體|拆標|限制性招標|專業工項/,
+    topic: "多次流標後的採購策略",
+    explain: "多次流標時可以檢討量體、專業工項、預算、工期與契約條件，必要時可合理拆標；但不能因為拆成專業工項，就當然改用限制性招標。招標方式仍要回到採購法的適用條件。",
+  },
+  {
+    match: /風險管理|營運維護|計畫階段|履約驗收階段/,
+    topic: "全生命週期風險管理階段",
+    explain: "全生命週期風險管理包含計畫、規劃設計、招標決標、履約驗收與營運維護。若題幹排除營運維護階段，表示生命週期被截斷，因此為錯。",
+  },
+  {
+    match: /異議|申訴|調解|招標|審標|決標|履約|驗收|保固/,
+    topic: "爭議處理分流",
+    explain: "招標、審標、決標階段的爭議走異議、申訴；履約、驗收、保固爭議多走調解、仲裁或訴訟。先判斷爭議發生在哪個階段，才能選對救濟途徑。",
+  },
+  {
+    match: /底價|比減價|標價偏低|不訂底價|評審委員會/,
+    topic: "底價與價格分析",
+    explain: "底價重點在訂定時點、核定權責、保密與減價比減價程序；標價偏低則要看總標價或部分標價是否低於規定比例，以及是否需通知廠商說明或成立評審機制。",
+  },
+  {
+    match: /最有利標|評選|優勝廠商|協商|固定費用|費率/,
+    topic: "最有利標與評選",
+    explain: "最有利標題目要先分辨採第56條最有利標、準用最有利標、參考最有利標精神，並注意評選委員會、評選項目、協商與議價程序是否符合規定。",
+  },
+  {
+    match: /契約|分包|轉包|違約金|契約變更|履約期限/,
+    topic: "採購契約與履約責任",
+    explain: "契約題要看契約是否成立、生效日、文件效力、契約變更是否經程序處理，以及分包和轉包的差異。轉包原則禁止；分包不免除得標廠商對機關的履約責任。",
+  },
+  {
+    match: /電子|電子領標|電子投標|電子報價|電子押標金|採購網/,
+    topic: "電子採購實務",
+    explain: "電子採購題要掌握電子領標、電子投標、電子報價與電子押標金的法律效果。電子化資料通常視同正式文件，但撤回、更正、補正仍要依招標文件及系統規定辦理。",
+  },
+];
 
 let progress = loadProgress();
 let session = [];
@@ -127,7 +189,7 @@ function questionTypeName(type) {
 }
 
 function answerText(question) {
-  if (question.type === "tf") return question.answer === "O" ? "O 正確" : "X 錯誤";
+  if (question.type === "tf") return question.answer === "O" ? "O（題目敘述正確）" : "X（題目敘述錯誤）";
   const idx = Number(question.answer) - 1;
   const option = question.options?.[idx] || "";
   return `(${question.answer}) ${option}`;
@@ -211,6 +273,11 @@ function relatedQuestionHint(question, anchorText) {
   return `延伸對照：同科第 ${candidates.map((entry) => `${entry.item.number} 題`).join("、第 ")} 也有相近概念，可用來交叉複習。`;
 }
 
+function reviewRule(question) {
+  const text = `${question.stem} ${question.raw}`;
+  return REVIEW_RULES.find((rule) => rule.match.test(text));
+}
+
 function choiceExplanation(question) {
   const intent = choiceIntent(question);
   const options = optionList(question);
@@ -291,10 +358,31 @@ function changedParts(wrongText, correctText) {
 function findTrueFalseCorrection(question) {
   if (question.type !== "tf") return null;
   if (tfCorrectionCache.has(question.id)) return tfCorrectionCache.get(question.id);
+  if (TF_EXPLANATION_OVERRIDES[question.id]) {
+    const detail = TF_EXPLANATION_OVERRIDES[question.id];
+    const result = {
+      kind: question.answer === "O" ? "true" : "false",
+      text: [
+        `考點：${detail.topic}。`,
+        `原題錯誤處：${detail.wrong}`,
+        detail.fix,
+        `為什麼：${detail.why}`,
+        detail.review,
+      ].join("\n"),
+    };
+    tfCorrectionCache.set(question.id, result);
+    return result;
+  }
   if (question.answer === "O") {
+    const rule = reviewRule(question);
     const result = {
       kind: "true",
-      text: "原題敘述本身就是正確版本，不需要改寫；若你選 X，請回頭檢查題幹中的期限、金額、程序或法律效果是否被你誤判。",
+      text: [
+        rule ? `考點：${rule.topic}。` : "考點：題幹所述程序或法律效果。",
+        "原題敘述本身就是正確版本，不需要改寫。",
+        rule ? `為什麼：${rule.explain}` : "為什麼：題幹的主詞、程序、期限、金額或法律效果與題庫標準答案一致，所以判定為 O。",
+        "複習提醒：若你選 X，通常是把相近程序、例外情形或絕對化用語誤判了。",
+      ].join("\n"),
     };
     tfCorrectionCache.set(question.id, result);
     return result;
@@ -313,9 +401,15 @@ function findTrueFalseCorrection(question) {
 
   const best = candidates[0];
   if (!best || (best.sim < 0.34 && !(best.distance <= 2 && best.sim >= 0.22))) {
+    const rule = reviewRule(question);
     const fallback = {
       kind: "false",
-      text: "這題題庫標準答案為 X，表示原題至少有一個關鍵敘述不正確；目前找不到足夠相似的正確句可自動比對，建議依來源題庫與條文檢查題幹中的期限、金額、機關、程序或法律效果。",
+      text: [
+        rule ? `考點：${rule.topic}。` : "考點：題幹中的關鍵程序、範圍或法律效果。",
+        "原題錯誤處：題幹至少有一個關鍵敘述與規定不一致，通常會藏在「僅、即、免、不得、應、得」或期限/金額/機關/程序效果中。",
+        rule ? `為什麼：${rule.explain}` : "為什麼：題庫標準答案為 X，代表不能照題幹文字直接記；作答時要把題幹拆成主詞、階段、條件、效果四段檢查。",
+        `如何修正：請把題幹中的絕對化或範圍錯置文字改回本科「${question.subject}」的正確程序與法律效果。${chapterHint(question)}`,
+      ].join("\n"),
     };
     tfCorrectionCache.set(question.id, fallback);
     return fallback;
@@ -324,9 +418,16 @@ function findTrueFalseCorrection(question) {
   const parts = changedParts(question.stem, best.item.stem);
   const wrongPart = parts.wrong || question.stem;
   const correctPart = parts.correct || best.item.stem;
+  const rule = reviewRule(question);
   const result = {
     kind: "false",
-    text: `原題錯誤處：「${wrongPart}」。正確應改為：「${correctPart}」。可對照同科是非題第 ${best.item.number} 題的正確敘述。`,
+    text: [
+      rule ? `考點：${rule.topic}。` : "考點：同科相近敘述比對。",
+      `原題錯誤處：「${wrongPart}」。`,
+      `正確應改為：「${correctPart}」。`,
+      rule ? `為什麼：${rule.explain}` : "為什麼：同科有相近的 O 題可作為正確版本，兩題差異處就是本題被改錯的地方。",
+      `可對照同科是非題第 ${best.item.number} 題的正確敘述。`,
+    ].join("\n"),
     matchedQuestion: best.item,
   };
   tfCorrectionCache.set(question.id, result);
@@ -338,13 +439,14 @@ function explanation(question, chosen) {
   const correctSentence = /[。！？.!?]$/.test(correct) ? correct : `${correct}。`;
   const keywords = extractKeywords(question);
   const chosenText = chosen ? (question.type === "choice" ? `(${chosen})` : chosen) : "未作答";
+  const resultText = chosen ? (chosen === question.answer ? "答對" : "答錯") : "未作答";
   const focus = keywords.length ? `本題判斷點：${keywords.join("、")}。` : "本題重點在題幹敘述與標準答案的差異。";
   const source = `來源：${question.source}，${question.subject}第 ${question.number} 題。`;
   if (question.type === "choice") {
-    return `你選 ${chosenText}，題庫標準答案是 ${correctSentence}\n${choiceExplanation(question)}\n${source}`;
+    return `作答結果：${resultText}。你選 ${chosenText}，題庫標準答案是 ${correctSentence}\n${choiceExplanation(question)}\n${source}`;
   }
   const correction = findTrueFalseCorrection(question);
-  return `你選 ${chosenText}，題庫標準答案是 ${correct}。${focus}${correction.text}${source}`;
+  return `作答結果：${resultText}。你選 ${chosenText}，題庫標準答案是 ${correct}。\n${focus}\n${correction.text}\n${source}`;
 }
 
 function filteredQuestions() {
