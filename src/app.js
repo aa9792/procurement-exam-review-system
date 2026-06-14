@@ -2,6 +2,15 @@ const DATA = window.EXAM_DATA;
 const QUESTIONS = DATA.questions;
 const SUBJECTS = DATA.subjects;
 const STORAGE_KEY = "procurement-exam-progress-v1";
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDFwKoHKw7iq2-tTzV9rx0fapYksunX6Wk",
+  authDomain: "procurement-certification.firebaseapp.com",
+  databaseURL: "https://procurement-certification-default-rtdb.firebaseio.com",
+  projectId: "procurement-certification",
+  storageBucket: "procurement-certification.firebasestorage.app",
+  messagingSenderId: "1066257908472",
+  appId: "1:1066257908472:web:fae8136650546007a4f10d",
+};
 const TF_EXPLANATION_OVERRIDES = {
   "01-tf-0002": {
     topic: "工程採購契約範本的物價調整機制",
@@ -72,6 +81,12 @@ let selectedAnswer = null;
 let answeredIds = new Set();
 let sessionResults = [];
 const tfCorrectionCache = new Map();
+let firebaseAuth = null;
+let firebaseDb = null;
+let currentUser = null;
+let cloudReady = false;
+let cloudSyncTimer = null;
+let isCloudLoading = false;
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
@@ -86,6 +101,170 @@ function loadProgress() {
 
 function saveProgress() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+  scheduleCloudSave();
+}
+
+function normalizeHistory(history) {
+  if (!history) return [];
+  const list = Array.isArray(history) ? history : Object.values(history);
+  return list.filter(Boolean).sort((a, b) => String(a.at || "").localeCompare(String(b.at || "")));
+}
+
+function normalizeProgressItem(item) {
+  const history = normalizeHistory(item.history);
+  if (history.length) {
+    return {
+      attempts: history.length,
+      correct: history.filter((entry) => entry.correct).length,
+      wrong: history.filter((entry) => !entry.correct).length,
+      history,
+      mastered: !!item.mastered,
+      lastAnswer: item.lastAnswer || history.at(-1)?.answer,
+      lastAt: item.lastAt || history.at(-1)?.at,
+    };
+  }
+  return {
+    attempts: Number(item.attempts || 0),
+    correct: Number(item.correct || 0),
+    wrong: Number(item.wrong || 0),
+    history: [],
+    mastered: !!item.mastered,
+    lastAnswer: item.lastAnswer || "",
+    lastAt: item.lastAt || "",
+  };
+}
+
+function mergeProgress(localProgress, cloudProgress) {
+  const merged = {};
+  const ids = new Set([...Object.keys(localProgress || {}), ...Object.keys(cloudProgress || {})]);
+  ids.forEach((id) => {
+    const localItem = localProgress?.[id] ? normalizeProgressItem(localProgress[id]) : null;
+    const cloudItem = cloudProgress?.[id] ? normalizeProgressItem(cloudProgress[id]) : null;
+    if (!localItem) {
+      merged[id] = cloudItem;
+      return;
+    }
+    if (!cloudItem) {
+      merged[id] = localItem;
+      return;
+    }
+    const combinedHistory = [...normalizeHistory(localItem.history), ...normalizeHistory(cloudItem.history)];
+    const unique = new Map();
+    combinedHistory.forEach((entry) => {
+      const key = `${entry.at || ""}-${entry.answer || ""}-${entry.correct ? "1" : "0"}`;
+      unique.set(key, entry);
+    });
+    const history = Array.from(unique.values()).sort((a, b) => String(a.at || "").localeCompare(String(b.at || "")));
+    if (history.length) {
+      merged[id] = {
+        attempts: history.length,
+        correct: history.filter((entry) => entry.correct).length,
+        wrong: history.filter((entry) => !entry.correct).length,
+        history,
+        mastered: localItem.mastered || cloudItem.mastered,
+        lastAnswer: history.at(-1)?.answer || localItem.lastAnswer || cloudItem.lastAnswer,
+        lastAt: history.at(-1)?.at || localItem.lastAt || cloudItem.lastAt,
+      };
+      return;
+    }
+    merged[id] = String(localItem.lastAt || "") >= String(cloudItem.lastAt || "") ? localItem : cloudItem;
+  });
+  return merged;
+}
+
+function updateSyncStatus(message) {
+  const el = $("#syncStatus");
+  if (el) el.textContent = message;
+}
+
+function userPath() {
+  return currentUser ? `procurementExamUsers/${currentUser.uid}` : "";
+}
+
+function scheduleCloudSave() {
+  if (!currentUser || !cloudReady || !firebaseDb || isCloudLoading) return;
+  clearTimeout(cloudSyncTimer);
+  updateSyncStatus("已登入，準備同步...");
+  cloudSyncTimer = setTimeout(pushProgressToCloud, 900);
+}
+
+async function pushProgressToCloud() {
+  if (!currentUser || !cloudReady || !firebaseDb) return;
+  try {
+    updateSyncStatus("同步中...");
+    await firebaseDb.ref(userPath()).set({
+      progress,
+      updatedAt: firebase.database.ServerValue.TIMESTAMP,
+      appVersion: "firebase-rtdb-v1",
+    });
+    updateSyncStatus(`已同步：${currentUser.displayName || currentUser.email || "已登入"}`);
+  } catch (error) {
+    updateSyncStatus(`同步失敗：${error.message}`);
+  }
+}
+
+async function loadProgressFromCloud(user) {
+  if (!firebaseDb) return;
+  isCloudLoading = true;
+  try {
+    updateSyncStatus("讀取雲端進度...");
+    const snapshot = await firebaseDb.ref(`procurementExamUsers/${user.uid}/progress`).once("value");
+    const cloudProgress = snapshot.val() || {};
+    progress = mergeProgress(progress, cloudProgress);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+    cloudReady = true;
+    isCloudLoading = false;
+    renderAll();
+    await pushProgressToCloud();
+  } catch (error) {
+    isCloudLoading = false;
+    cloudReady = false;
+    updateSyncStatus(`雲端讀取失敗：${error.message}`);
+  }
+}
+
+function initFirebaseSync() {
+  if (!window.firebase) {
+    updateSyncStatus("Firebase 載入失敗，使用本機紀錄");
+    return;
+  }
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    firebaseAuth = firebase.auth();
+    firebaseDb = firebase.database();
+    firebaseAuth.onAuthStateChanged((user) => {
+      currentUser = user;
+      cloudReady = false;
+      clearTimeout(cloudSyncTimer);
+      if (user) {
+        $("#loginBtn")?.classList.add("hidden");
+        $("#logoutBtn")?.classList.remove("hidden");
+        loadProgressFromCloud(user);
+      } else {
+        $("#loginBtn")?.classList.remove("hidden");
+        $("#logoutBtn")?.classList.add("hidden");
+        updateSyncStatus("未登入，使用本機紀錄");
+      }
+    });
+  } catch (error) {
+    updateSyncStatus(`Firebase 初始化失敗：${error.message}`);
+  }
+}
+
+async function loginWithGoogle() {
+  if (!firebaseAuth) return updateSyncStatus("Firebase 尚未初始化");
+  try {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    await firebaseAuth.signInWithPopup(provider);
+  } catch (error) {
+    updateSyncStatus(`登入失敗：${error.message}`);
+  }
+}
+
+async function logout() {
+  if (!firebaseAuth) return;
+  await firebaseAuth.signOut();
 }
 
 function todayISO() {
@@ -846,6 +1025,8 @@ function renderAll() {
 
 function bindEvents() {
   $$(".tab").forEach((btn) => btn.addEventListener("click", () => switchTab(btn.dataset.tab)));
+  $("#loginBtn")?.addEventListener("click", loginWithGoogle);
+  $("#logoutBtn")?.addEventListener("click", logout);
   $("#startQuizBtn").addEventListener("click", () => startQuiz());
   $("#startTodayBtn").addEventListener("click", () => startQuiz({ mode: "unseen" }));
   $("#wrongQuickBtn").addEventListener("click", () => startQuiz({ mode: "wrong" }));
@@ -877,3 +1058,4 @@ function bindEvents() {
 setupSelectors();
 bindEvents();
 renderAll();
+initFirebaseSync();

@@ -21,3 +21,28 @@
 ## 題庫資料
 
 題庫資料由本機 PDF 解析後產生於 `data/questions.js`。原始 PDF 與講義檔案未放入此 repo。
+
+## Firebase 同步
+
+網站使用 Firebase Authentication 與 Realtime Database 同步作答進度。
+
+Realtime Database 規則：
+
+```json
+{
+  "rules": {
+    "procurementExamUsers": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    }
+  }
+}
+```
+
+Authentication 需啟用 Google 登入，並將 GitHub Pages 網域加入 Authorized domains：
+
+```text
+aa9792.github.io
+```

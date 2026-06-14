@@ -115,6 +115,27 @@ h3 {
   padding: 8px 12px;
 }
 
+.header-tools,
+.auth-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.auth-panel {
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.auth-panel span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .exam-pill span,
 .tag {
   color: var(--muted);
@@ -558,11 +579,20 @@ footer {
 
 @media (max-width: 900px) {
   .app-header,
+  .header-tools,
   .panel-title-row,
   .section-title.split,
   footer {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .auth-panel {
+    justify-content: stretch;
+  }
+
+  .auth-panel button {
+    width: 100%;
   }
 
   .hero-grid,

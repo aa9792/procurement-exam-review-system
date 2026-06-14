@@ -12,9 +12,16 @@
         <p class="eyebrow">115 年採購人員基礎訓練</p>
         <h1>採購證照複習系統</h1>
       </div>
-      <div class="exam-pill">
-        <span>考試日</span>
-        <strong>2026/08/02</strong>
+      <div class="header-tools">
+        <div class="exam-pill">
+          <span>考試日</span>
+          <strong>2026/08/02</strong>
+        </div>
+        <div class="auth-panel">
+          <span id="syncStatus">未登入，使用本機紀錄</span>
+          <button id="loginBtn">Google 登入同步</button>
+          <button id="logoutBtn" class="hidden">登出</button>
+        </div>
       </div>
     </header>
 
@@ -163,6 +170,9 @@
 
     <script src="./data/questions.js"></script>
     <script src="./data/chapter-charts.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
     <script src="./src/app.js"></script>
   </body>
 </html>
