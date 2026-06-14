@@ -9,6 +9,7 @@ let sessionIndex = 0;
 let selectedAnswer = null;
 let answeredIds = new Set();
 let sessionResults = [];
+const tfCorrectionCache = new Map();
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
@@ -140,6 +141,99 @@ function extractKeywords(question) {
   return [...new Set([...found, ...numbers])].slice(0, 6);
 }
 
+function compactText(value) {
+  return String(value || "").replace(/[\s，。；：、（）()「」『』,.!?！？;:]/g, "");
+}
+
+function bigrams(value) {
+  const text = compactText(value);
+  if (text.length <= 1) return text ? [text] : [];
+  const grams = [];
+  for (let i = 0; i < text.length - 1; i += 1) {
+    grams.push(text.slice(i, i + 2));
+  }
+  return grams;
+}
+
+function similarity(a, b) {
+  const aSet = new Set(bigrams(a));
+  const bSet = new Set(bigrams(b));
+  if (!aSet.size || !bSet.size) return 0;
+  let overlap = 0;
+  aSet.forEach((item) => {
+    if (bSet.has(item)) overlap += 1;
+  });
+  return overlap / (aSet.size + bSet.size - overlap);
+}
+
+function changedParts(wrongText, correctText) {
+  let start = 0;
+  const wrong = wrongText.trim();
+  const correct = correctText.trim();
+  while (start < wrong.length && start < correct.length && wrong[start] === correct[start]) {
+    start += 1;
+  }
+  let wrongEnd = wrong.length - 1;
+  let correctEnd = correct.length - 1;
+  while (
+    wrongEnd >= start &&
+    correctEnd >= start &&
+    wrong[wrongEnd] === correct[correctEnd]
+  ) {
+    wrongEnd -= 1;
+    correctEnd -= 1;
+  }
+  return {
+    wrong: wrong.slice(start, wrongEnd + 1).trim(),
+    correct: correct.slice(start, correctEnd + 1).trim(),
+  };
+}
+
+function findTrueFalseCorrection(question) {
+  if (question.type !== "tf") return null;
+  if (tfCorrectionCache.has(question.id)) return tfCorrectionCache.get(question.id);
+  if (question.answer === "O") {
+    const result = {
+      kind: "true",
+      text: "原題敘述本身就是正確版本，不需要改寫；若你選 X，請回頭檢查題幹中的期限、金額、程序或法律效果是否被你誤判。",
+    };
+    tfCorrectionCache.set(question.id, result);
+    return result;
+  }
+
+  const candidates = QUESTIONS.filter(
+    (item) => item.type === "tf" && item.subjectId === question.subjectId && item.answer === "O"
+  )
+    .map((item) => {
+      const sim = similarity(question.stem, item.stem);
+      const distance = Math.abs(question.number - item.number);
+      const distanceBonus = distance <= 4 ? 0.2 - distance * 0.035 : 0;
+      return { item, sim, score: sim + Math.max(distanceBonus, 0), distance };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const best = candidates[0];
+  if (!best || (best.sim < 0.34 && !(best.distance <= 2 && best.sim >= 0.22))) {
+    const fallback = {
+      kind: "false",
+      text: "這題題庫標準答案為 X，表示原題至少有一個關鍵敘述不正確；目前找不到足夠相似的正確句可自動比對，建議依來源題庫與條文檢查題幹中的期限、金額、機關、程序或法律效果。",
+    };
+    tfCorrectionCache.set(question.id, fallback);
+    return fallback;
+  }
+
+  const parts = changedParts(question.stem, best.item.stem);
+  const wrongPart = parts.wrong || question.stem;
+  const correctPart = parts.correct || best.item.stem;
+  const result = {
+    kind: "false",
+    text: `原題錯誤處：「${wrongPart}」。正確應改為：「${correctPart}」。可對照同科是非題第 ${best.item.number} 題的正確敘述。`,
+    matchedQuestion: best.item,
+  };
+  tfCorrectionCache.set(question.id, result);
+  return result;
+}
+
 function explanation(question, chosen) {
   const correct = answerText(question);
   const keywords = extractKeywords(question);
@@ -149,7 +243,8 @@ function explanation(question, chosen) {
   if (question.type === "choice") {
     return `你選 ${chosenText}，題庫標準答案是 ${correct}。${focus}選擇題建議把正確選項整句記下來，再回頭比較其他選項被改動的期限、金額、程序或效力。${source}`;
   }
-  return `你選 ${chosenText}，題庫標準答案是 ${correct}。${focus}是非題通常只改一個關鍵字，請特別檢查「應/得/不得」、期限、管轄機關與法律效果。${source}`;
+  const correction = findTrueFalseCorrection(question);
+  return `你選 ${chosenText}，題庫標準答案是 ${correct}。${focus}${correction.text}${source}`;
 }
 
 function filteredQuestions() {
