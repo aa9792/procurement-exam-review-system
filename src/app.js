@@ -177,6 +177,30 @@ function updateSyncStatus(message) {
   if (el) el.textContent = message;
 }
 
+function authErrorMessage(error) {
+  const host = window.location.hostname || "(unknown host)";
+  if (error.code === "auth/unauthorized-domain") {
+    return `登入失敗：目前網域 ${host} 尚未被 Firebase 授權。請確認 Authentication > Settings > Authorized domains 有加入 ${host}。`;
+  }
+  if (error.code === "auth/operation-not-allowed") {
+    return "登入失敗：Firebase 尚未啟用 Google 登入。請到 Authentication > Sign-in method 啟用 Google。";
+  }
+  if (error.code === "auth/popup-blocked") {
+    return "登入視窗被瀏覽器阻擋，改用重新導向登入...";
+  }
+  return `登入失敗：${error.message}`;
+}
+
+function shouldUseRedirectLogin() {
+  return window.matchMedia("(max-width: 760px)").matches || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+}
+
+function googleProvider() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  return provider;
+}
+
 function userPath() {
   return currentUser ? `procurementExamUsers/${currentUser.uid}` : "";
 }
@@ -232,6 +256,9 @@ function initFirebaseSync() {
     if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
     firebaseAuth = firebase.auth();
     firebaseDb = firebase.database();
+    firebaseAuth
+      .getRedirectResult()
+      .catch((error) => updateSyncStatus(authErrorMessage(error)));
     firebaseAuth.onAuthStateChanged((user) => {
       currentUser = user;
       cloudReady = false;
@@ -253,12 +280,21 @@ function initFirebaseSync() {
 
 async function loginWithGoogle() {
   if (!firebaseAuth) return updateSyncStatus("Firebase 尚未初始化");
+  const provider = googleProvider();
   try {
-    const provider = new firebase.auth.GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: "select_account" });
+    updateSyncStatus("開啟 Google 登入...");
+    if (shouldUseRedirectLogin()) {
+      await firebaseAuth.signInWithRedirect(provider);
+      return;
+    }
     await firebaseAuth.signInWithPopup(provider);
   } catch (error) {
-    updateSyncStatus(`登入失敗：${error.message}`);
+    if (["auth/popup-blocked", "auth/popup-closed-by-user", "auth/cancelled-popup-request"].includes(error.code)) {
+      updateSyncStatus("Popup 登入失敗，改用重新導向登入...");
+      await firebaseAuth.signInWithRedirect(provider);
+      return;
+    }
+    updateSyncStatus(authErrorMessage(error));
   }
 }
 
