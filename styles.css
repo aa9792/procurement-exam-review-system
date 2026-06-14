@@ -236,6 +236,7 @@ h3 {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 16px;
+  min-width: 0;
 }
 
 .group-meta {
@@ -278,6 +279,7 @@ h3 {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
+  min-width: 0;
 }
 
 .note-card ul {
@@ -287,6 +289,108 @@ h3 {
 
 .note-card li {
   margin: 6px 0;
+}
+
+.note-card h4 {
+  margin: 14px 0 8px;
+  font-size: 15px;
+}
+
+.chart-block {
+  border-top: 1px solid var(--line);
+  margin-top: 14px;
+  padding-top: 12px;
+}
+
+.flow-chart {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.flow-chart li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+}
+
+.flow-chart span {
+  display: inline-grid;
+  flex: 0 0 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.flow-chart strong {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.chart-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  max-width: 100%;
+}
+
+.chart-table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.chart-table th,
+.chart-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  line-height: 1.5;
+}
+
+.chart-table thead th {
+  background: #e8f1ed;
+  color: var(--accent);
+}
+
+.chart-table tbody tr:last-child th,
+.chart-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.memory-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.memory-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fff5e9;
+  color: #7f471c;
+  border: 1px solid #efd0ad;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .source-link {
@@ -473,6 +577,10 @@ footer {
 
   .subject-row,
   .schedule-card {
+    grid-template-columns: 1fr;
+  }
+
+  .flow-chart {
     grid-template-columns: 1fr;
   }
 

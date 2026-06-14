@@ -387,6 +387,48 @@ function renderSubjectProgress() {
   }).join("");
 }
 
+function renderChapterChart(subject) {
+  const chart = window.CHAPTER_CHARTS?.[subject.id];
+  if (!chart) return "";
+  const flow = chart.flow
+    .map((step, index) => `
+      <li>
+        <span>${index + 1}</span>
+        <strong>${escapeHTML(step)}</strong>
+      </li>`)
+    .join("");
+  const rows = chart.table
+    .map((row) => `
+      <tr>
+        <th>${escapeHTML(row[0])}</th>
+        <td>${escapeHTML(row[1])}</td>
+        <td>${escapeHTML(row[2])}</td>
+      </tr>`)
+    .join("");
+  const memory = chart.memory
+    .map((item) => `<span class="memory-chip">${escapeHTML(item)}</span>`)
+    .join("");
+  return `
+    <div class="chart-block">
+      <h4>${escapeHTML(chart.flowTitle)}</h4>
+      <ol class="flow-chart">${flow}</ol>
+      <h4>${escapeHTML(chart.tableTitle)}</h4>
+      <div class="chart-table-wrap">
+        <table class="chart-table">
+          <thead>
+            <tr>
+              <th>項目</th>
+              <th>核心</th>
+              <th>考題陷阱</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div class="memory-row">${memory}</div>
+    </div>`;
+}
+
 function renderNotes() {
   $("#notesGrid").innerHTML = SUBJECTS.map((subject) => `
     <article class="note-card">
@@ -398,6 +440,7 @@ function renderNotes() {
       <h3>${escapeHTML(subject.title)}</h3>
       <p><strong>條文/內容主軸：</strong>${escapeHTML(subject.articleFocus)}</p>
       <ul>${subject.notes.map((note) => `<li>${escapeHTML(note)}</li>`).join("")}</ul>
+      ${renderChapterChart(subject)}
       <p class="muted">題庫：選擇 ${subject.choice} 題，是非 ${subject.tf} 題，合計 ${subject.total} 題</p>
       <p class="source-path">來源 PDF：${escapeHTML(subject.source)}</p>
     </article>`).join("");
