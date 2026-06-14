@@ -192,7 +192,7 @@ function authErrorMessage(error) {
 }
 
 function shouldUseRedirectLogin() {
-  return window.matchMedia("(max-width: 760px)").matches || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  return false;
 }
 
 function googleProvider() {
@@ -283,10 +283,6 @@ async function loginWithGoogle() {
   const provider = googleProvider();
   try {
     updateSyncStatus("開啟 Google 登入...");
-    if (shouldUseRedirectLogin()) {
-      await firebaseAuth.signInWithRedirect(provider);
-      return;
-    }
     await firebaseAuth.signInWithPopup(provider);
   } catch (error) {
     if (["auth/popup-blocked", "auth/popup-closed-by-user", "auth/cancelled-popup-request"].includes(error.code)) {
