@@ -10,6 +10,15 @@ import fitz
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(__file__).resolve().parents[1] / "data" / "questions.js"
+PLACEHOLDER_MARKERS = (
+    "模擬題庫",
+    "[模擬題庫]",
+    "自動產生的模擬題目",
+    "滿足30題隨機抽題",
+    "滿足 30 題隨機抽題",
+    "30題隨機抽題機制",
+    "隨機抽題機制所自動產生",
+)
 
 
 SUBJECTS = {
@@ -306,6 +315,13 @@ def split_choice_text(text: str) -> tuple[str, list[str] | None]:
     return stem, options
 
 
+def is_placeholder_question(*parts: object) -> bool:
+    searchable = " ".join(str(part) for part in parts if part)
+    return any(marker in searchable for marker in PLACEHOLDER_MARKERS) or (
+        "為了滿足" in searchable and "隨機抽題" in searchable and "自動產生" in searchable
+    )
+
+
 def source_type(path: Path) -> str:
     if "法規課程" in str(path):
         return "法規課程"
@@ -400,6 +416,8 @@ def build() -> None:
         for qtype, section_text in [("choice", choice_text), ("tf", tf_text)]:
             for item in parse_section(section_text, qtype):
                 stem, options = split_choice_text(item["text"]) if qtype == "choice" else (item["text"], None)
+                if is_placeholder_question(path, meta["title"], stem, item["text"], *(options or [])):
+                    continue
                 qid = f"{subject_id}-{qtype}-{item['number']:04d}"
                 parsed.append(
                     {

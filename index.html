@@ -9,170 +9,121 @@
   <body>
     <header class="app-header">
       <div>
-        <p class="eyebrow">115 年採購人員基礎訓練</p>
+        <p class="eyebrow">115 年政府採購專業人員基礎訓練</p>
         <h1>採購證照複習系統</h1>
       </div>
-      <div class="header-tools">
-        <div class="exam-pill">
-          <span>考試日</span>
-          <strong>2026/08/02</strong>
-        </div>
-        <div class="auth-panel">
-          <span id="syncStatus">未登入，使用本機紀錄</span>
-          <button id="loginBtn">Google 登入同步</button>
-          <button id="logoutBtn" class="hidden">登出</button>
-        </div>
+      <div class="header-actions">
+        <button id="exportBtn" type="button">匯出進度</button>
+        <button id="importBtn" type="button">匯入進度</button>
+        <button id="clearBtn" type="button">清除紀錄</button>
+        <input id="importFile" class="hidden" type="file" accept="application/json" />
       </div>
     </header>
 
     <main>
-      <section class="hero-grid">
-        <article class="panel stat-panel">
-          <div>
-            <span class="metric-label">距離考試</span>
-            <strong id="daysLeft" class="metric">--</strong>
-            <span class="metric-unit">天</span>
-          </div>
-          <div>
-            <span class="metric-label">題庫覆蓋率</span>
-            <strong id="coverageRate" class="metric">0%</strong>
-            <span id="coverageDetail" class="metric-unit">0 / 3599 題</span>
-          </div>
-          <div>
-            <span class="metric-label">錯題待複習</span>
-            <strong id="wrongCount" class="metric">0</strong>
-            <span class="metric-unit">題</span>
-          </div>
+      <section class="stats-grid" aria-label="題庫統計">
+        <article class="stat-card">
+          <span>真題總數</span>
+          <strong id="totalQuestions">0</strong>
         </article>
-
-        <article class="panel today-panel">
-          <div class="panel-title-row">
-            <h2>今日進度</h2>
-            <span id="todayPhase" class="tag">--</span>
-          </div>
-          <p id="todayFocus" class="large-text">讀取中...</p>
-          <p id="todayNote" class="muted"></p>
-          <div class="today-actions">
-            <button id="startTodayBtn" class="primary">開始今日 20 題</button>
-            <button id="wrongQuickBtn">練錯題</button>
-          </div>
+        <article class="stat-card">
+          <span>已練題數</span>
+          <strong id="attemptedQuestions">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>目前錯題</span>
+          <strong id="wrongQuestions">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>假題檢查</span>
+          <strong id="placeholderCount">0</strong>
         </article>
       </section>
 
-      <nav class="tabs" aria-label="功能分頁">
-        <button class="tab is-active" data-tab="dashboard">總覽</button>
-        <button class="tab" data-tab="notes">內容整理</button>
-        <button class="tab" data-tab="quiz">測驗複習</button>
-        <button class="tab" data-tab="wrongs">錯題紀錄</button>
-        <button class="tab" data-tab="schedule">每日計畫</button>
-        <button class="tab" data-tab="bank">題庫搜尋</button>
-      </nav>
+      <section class="layout">
+        <aside class="panel controls-panel">
+          <h2>出題設定</h2>
+          <label>
+            科目
+            <select id="subjectSelect"></select>
+          </label>
+          <label>
+            題型
+            <select id="typeSelect">
+              <option value="all">選擇 + 是非</option>
+              <option value="choice">只練選擇題</option>
+              <option value="tf">只是非題</option>
+            </select>
+          </label>
+          <label>
+            模式
+            <select id="modeSelect">
+              <option value="unseen">未練題優先</option>
+              <option value="random">隨機練習</option>
+              <option value="wrong">錯題複習</option>
+            </select>
+          </label>
+          <label>
+            題數
+            <select id="countSelect">
+              <option value="10">10 題</option>
+              <option value="20" selected>20 題</option>
+              <option value="30">30 題</option>
+              <option value="50">50 題</option>
+            </select>
+          </label>
+          <button id="startBtn" class="primary full" type="button">開始複習</button>
+          <button id="wrongBtn" class="full" type="button">直接練錯題</button>
+          <p id="poolInfo" class="muted"></p>
+        </aside>
 
-      <section id="dashboard" class="tab-panel is-active">
-        <div class="section-title">
-          <h2>三大考程</h2>
-          <p>依照片中的考試時段與配分建立，練習進度會自動回填。</p>
-        </div>
-        <div id="groupCards" class="group-grid"></div>
+        <section class="panel quiz-panel">
+          <div id="quizIntro" class="empty-state">
+            <h2>選科目後開始練習</h2>
+            <p>此頁只會使用本資料夾 `data/questions.js` 內的 3599 題真題，不再產生或顯示模擬占位題。</p>
+          </div>
+          <div id="quizArea" class="hidden"></div>
+        </section>
+      </section>
+
+      <section class="panel progress-panel">
         <div class="section-title">
           <h2>科目進度</h2>
-          <p>「未練題」模式會優先抽還沒做過的題目，目標是考前每題至少碰過一次。</p>
+          <p class="muted">依已作答題數統計，錯題做對後可在下方標記熟練。</p>
         </div>
         <div id="subjectProgress" class="subject-list"></div>
       </section>
 
-      <section id="notes" class="tab-panel">
-        <div class="section-title">
-          <h2>內容與條文整理</h2>
-          <p>每科先用這裡抓架構，再用題庫把細節補起來。</p>
-        </div>
-        <div id="notesGrid" class="notes-grid"></div>
-      </section>
-
-      <section id="quiz" class="tab-panel">
-        <div class="quiz-shell">
-          <aside class="panel quiz-config">
-            <h2>出題設定</h2>
-            <label>
-              科目
-              <select id="subjectSelect"></select>
-            </label>
-            <label>
-              題型
-              <select id="typeSelect">
-                <option value="all">選擇 + 是非</option>
-                <option value="choice">只練選擇題</option>
-                <option value="tf">只是非題</option>
-              </select>
-            </label>
-            <label>
-              模式
-              <select id="modeSelect">
-                <option value="unseen">未練題優先</option>
-                <option value="wrong">錯題複習</option>
-                <option value="mixed">混合隨機</option>
-                <option value="weak">弱科優先</option>
-              </select>
-            </label>
-            <button id="startQuizBtn" class="primary full">產生 20 題</button>
-            <button id="resetSessionBtn" class="full">清空本回測驗</button>
-          </aside>
-          <div class="panel quiz-main">
-            <div id="quizIntro" class="empty-state">
-              <h2>準備開始</h2>
-              <p>每回固定 20 題。答錯會自動進錯題紀錄，並顯示詳解與來源檔案。</p>
-            </div>
-            <div id="quizArea" class="quiz-area hidden"></div>
-          </div>
-        </div>
-      </section>
-
-      <section id="wrongs" class="tab-panel">
+      <section class="panel review-panel">
         <div class="section-title split">
           <div>
-            <h2>錯題紀錄</h2>
-            <p>錯過的題目會留在瀏覽器本機紀錄。做對後可標記熟練。</p>
+            <h2>錯題複習</h2>
+            <p class="muted">答錯且尚未標記熟練的題目會出現在這裡。</p>
           </div>
-          <div class="inline-actions">
-            <button id="exportBtn">匯出紀錄</button>
-            <button id="importBtn">匯入紀錄</button>
-            <button id="clearProgressBtn">清除全部進度</button>
-            <input id="importFile" class="hidden" type="file" accept="application/json" />
-          </div>
+          <button id="refreshWrongBtn" type="button">更新錯題</button>
         </div>
         <div id="wrongList" class="question-list"></div>
       </section>
 
-      <section id="schedule" class="tab-panel">
-        <div class="section-title">
-          <h2>每日複習計畫</h2>
-          <p>從 2026/06/14 排到 2026/08/01。建議每天 3 至 5 回，每回 20 題。</p>
-        </div>
-        <div id="scheduleList" class="schedule-list"></div>
-      </section>
-
-      <section id="bank" class="tab-panel">
+      <section class="panel bank-panel">
         <div class="section-title split">
           <div>
             <h2>題庫搜尋</h2>
-            <p>查關鍵字、條號、期限或金額，快速回到常錯概念。</p>
+            <p class="muted">可搜尋關鍵字、科目名稱或題目文字。</p>
           </div>
-          <input id="searchInput" class="search" type="search" placeholder="輸入關鍵字，例如：申訴、底價、15日" />
+          <input id="searchInput" class="search" type="search" placeholder="輸入關鍵字" />
         </div>
         <div id="bankList" class="question-list"></div>
       </section>
     </main>
 
     <footer>
-      <span>資料來源：本資料夾內 14 份題庫 PDF 與考試科目照片。</span>
       <span id="generatedAt"></span>
+      <span>進度儲存在本機瀏覽器，可匯出備份。</span>
     </footer>
 
     <script src="./data/questions.js"></script>
     <script src="./data/chapter-charts.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
     <script src="./src/app.js"></script>
   </body>
 </html>
