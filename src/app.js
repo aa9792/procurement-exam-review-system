@@ -1,5 +1,10 @@
 const DATA = window.EXAM_DATA;
-const QUESTIONS = DATA.questions;
+const COURSE_SUBJECT_IDS = {
+  "法規課程": ["01", "02", "03", "04"],
+  "實務課程": ["07", "08", "10", "14"],
+  "其他課程": ["05", "06", "09", "11", "12", "13"],
+};
+const QUESTIONS = DATA.questions.filter(isQuestionBankQuestion);
 const SUBJECTS = DATA.subjects;
 const STORAGE_KEY = "procurement-exam-progress-v1";
 const FIREBASE_CONFIG = {
@@ -399,6 +404,10 @@ function questionTypeName(type) {
   return type === "choice" ? "選擇題" : "是非題";
 }
 
+function sourceFileName(source) {
+  return String(source || "").split(/[\\/]/).pop() || source;
+}
+
 function answerText(question) {
   if (question.type === "tf") return question.answer === "O" ? "O（題目敘述正確）" : "X（題目敘述錯誤）";
   const idx = Number(question.answer) - 1;
@@ -660,14 +669,29 @@ function explanation(question, chosen) {
   return `作答結果：${resultText}。你選 ${chosenText}，題庫標準答案是 ${correct}。\n${focus}\n${correction.text}\n${source}`;
 }
 
+function isQuestionBankQuestion(question) {
+  const subjectIds = COURSE_SUBJECT_IDS[question.group] || [];
+  return (
+    subjectIds.includes(question.subjectId) &&
+    question.source.includes("題庫") &&
+    !question.source.includes("題庫數量")
+  );
+}
+
+function subjectMatchesSelection(question, selection) {
+  if (selection === "all") return true;
+  if (selection.startsWith("group:")) {
+    const group = selection.slice("group:".length);
+    return (COURSE_SUBJECT_IDS[group] || []).includes(question.subjectId);
+  }
+  return question.subjectId === selection;
+}
+
 function filteredQuestions() {
   const subject = $("#subjectSelect").value;
   const type = $("#typeSelect").value;
   return QUESTIONS.filter((q) => {
-    const subjectOK =
-      subject === "all" ||
-      q.subjectId === subject ||
-      q.group === subject.replace("group:", "");
+    const subjectOK = subjectMatchesSelection(q, subject);
     const typeOK = type === "all" || q.type === type;
     return subjectOK && typeOK;
   });
@@ -765,6 +789,7 @@ function renderQuiz() {
           <span class="mini-tag">${escapeHTML(question.group)}</span>
           <span class="mini-tag">${escapeHTML(question.subject)}</span>
           <span class="mini-tag">${questionTypeName(question.type)}</span>
+          <span class="mini-tag">來源：${escapeHTML(sourceFileName(question.source))}</span>
         </div>
       </div>
       <span class="muted">已練 ${statsForQuestion(question.id).attempts} 次</span>
