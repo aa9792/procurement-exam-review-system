@@ -357,10 +357,32 @@ function questionCard(question, options = {}) {
     </article>`;
 }
 
+function wrongQuestionItem(question) {
+  const stat = statsFor(question.id);
+  const title = `${question.subjectId}. ${question.subject} / ${questionTypeLabel(question.type)} / 原題第 ${question.number} 題`;
+  return `
+    <details class="wrong-item">
+      <summary>
+        <span>${escapeHTML(title)}</span>
+        <span class="wrong-count">錯 ${stat.wrong || 0} 次</span>
+      </summary>
+      <div class="wrong-detail">
+        <p>${escapeHTML(questionText(question))}</p>
+        <p><strong>標準答案：</strong>${escapeHTML(answerLabel(question))}</p>
+        <div class="card-actions">
+          <span class="source-path">${escapeHTML(question.source)}</span>
+          <button data-master="${question.id}" type="button">標記熟練</button>
+        </div>
+      </div>
+    </details>`;
+}
+
 function renderWrongs() {
   const wrongs = QUESTIONS.filter(isWrongQuestion);
   $("#wrongList").innerHTML = wrongs.length
-    ? wrongs.slice(0, 200).map((question) => questionCard(question, { master: true })).join("")
+    ? `
+      <div class="wrong-summary">共有 ${wrongs.length} 題待複習，點開題目列可查看內容與答案。</div>
+      ${wrongs.map((question) => wrongQuestionItem(question)).join("")}`
     : `<div class="empty-state"><h2>目前沒有錯題</h2><p>答錯的題目會自動出現在這裡。</p></div>`;
   $$("[data-master]").forEach((button) => {
     button.addEventListener("click", () => {
