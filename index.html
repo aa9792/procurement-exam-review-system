@@ -13,6 +13,9 @@
         <h1>採購證照複習系統</h1>
       </div>
       <div class="header-actions">
+        <span id="syncStatus" class="sync-status">未登入，使用本機紀錄</span>
+        <button id="loginBtn" type="button">Google 登入同步</button>
+        <button id="logoutBtn" class="hidden" type="button">登出</button>
         <button id="exportBtn" type="button">匯出進度</button>
         <button id="importBtn" type="button">匯入進度</button>
         <button id="clearBtn" type="button">清除紀錄</button>
@@ -119,11 +122,14 @@
 
     <footer>
       <span id="generatedAt"></span>
-      <span>進度儲存在本機瀏覽器，可匯出備份。</span>
+      <span>未登入時進度儲存在本機瀏覽器；Google 登入後會同步練習紀錄。</span>
     </footer>
 
     <script src="./data/questions.js"></script>
     <script src="./data/chapter-charts.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
     <script src="./src/app.js"></script>
   </body>
 </html>

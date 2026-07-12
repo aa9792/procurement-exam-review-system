@@ -1,5 +1,14 @@
 const DATA = window.EXAM_DATA || { questions: [], subjects: [], exam: {}, generatedAt: "" };
 const STORAGE_KEY = "procurement-review-progress-v2";
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDFwKoHKw7iq2-tTzV9rx0fapYksunX6Wk",
+  authDomain: "procurement-certification.firebaseapp.com",
+  databaseURL: "https://procurement-certification-default-rtdb.firebaseio.com",
+  projectId: "procurement-certification",
+  storageBucket: "procurement-certification.firebasestorage.app",
+  messagingSenderId: "1066257908472",
+  appId: "1:1066257908472:web:fae8136650546007a4f10d",
+};
 const PLACEHOLDER_MARKERS = [
   "模擬題庫",
   "[模擬題庫]",
@@ -60,6 +69,12 @@ let progress = loadProgress();
 let session = [];
 let sessionIndex = 0;
 let sessionAnswers = {};
+let firebaseAuth = null;
+let firebaseDb = null;
+let currentUser = null;
+let cloudReady = false;
+let cloudSaveTimer = null;
+let isCloudLoading = false;
 
 function loadProgress() {
   try {
@@ -72,6 +87,7 @@ function loadProgress() {
 
 function saveProgress() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+  scheduleCloudSave();
 }
 
 function statsFor(id) {
@@ -94,6 +110,173 @@ function normalizeProgressItem(item = {}) {
     lastAnswer: item.lastAnswer || "",
     lastAt: item.lastAt || "",
   };
+}
+
+function mergeProgress(localProgress = {}, cloudProgress = {}) {
+  const merged = {};
+  const ids = new Set([...Object.keys(localProgress || {}), ...Object.keys(cloudProgress || {})]);
+  ids.forEach((id) => {
+    const hasLocal = !!localProgress?.[id];
+    const hasCloud = !!cloudProgress?.[id];
+    if (!hasLocal && !hasCloud) return;
+    const localItem = hasLocal ? normalizeProgressItem(localProgress[id]) : null;
+    const cloudItem = hasCloud ? normalizeProgressItem(cloudProgress[id]) : null;
+    if (!localItem) {
+      merged[id] = cloudItem;
+      return;
+    }
+    if (!cloudItem) {
+      merged[id] = localItem;
+      return;
+    }
+    const newer = String(localItem.lastAt || "") >= String(cloudItem.lastAt || "") ? localItem : cloudItem;
+    const correct = Math.max(localItem.correct, cloudItem.correct);
+    const wrong = Math.max(localItem.wrong, cloudItem.wrong);
+    merged[id] = {
+      attempts: Math.max(localItem.attempts, cloudItem.attempts, correct + wrong),
+      correct,
+      wrong,
+      mastered: localItem.mastered || cloudItem.mastered,
+      lastAnswer: newer.lastAnswer || localItem.lastAnswer || cloudItem.lastAnswer || "",
+      lastAt: newer.lastAt || localItem.lastAt || cloudItem.lastAt || "",
+    };
+  });
+  return merged;
+}
+
+function updateSyncStatus(message) {
+  const el = $("#syncStatus");
+  if (el) el.textContent = message;
+}
+
+function updateAuthControls() {
+  $("#loginBtn")?.classList.toggle("hidden", !!currentUser);
+  $("#logoutBtn")?.classList.toggle("hidden", !currentUser);
+}
+
+function authErrorMessage(error) {
+  const host = window.location.hostname || "目前網域";
+  if (error?.code === "auth/unauthorized-domain") {
+    return `登入失敗：${host} 尚未加入 Firebase 授權網域。`;
+  }
+  if (error?.code === "auth/operation-not-allowed") {
+    return "登入失敗：Firebase 尚未啟用 Google 登入。";
+  }
+  return `登入失敗：${error?.message || "請稍後再試"}`;
+}
+
+function googleProvider() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  return provider;
+}
+
+function userProgressPath(uid = currentUser?.uid) {
+  return uid ? `procurementExamUsers/${uid}/progressV2` : "";
+}
+
+function scheduleCloudSave() {
+  if (!currentUser || !cloudReady || !firebaseDb || isCloudLoading) return;
+  clearTimeout(cloudSaveTimer);
+  updateSyncStatus("已登入，準備同步...");
+  cloudSaveTimer = setTimeout(pushProgressToCloud, 800);
+}
+
+async function pushProgressToCloud() {
+  if (!currentUser || !cloudReady || !firebaseDb) return;
+  try {
+    updateSyncStatus("同步中...");
+    await firebaseDb.ref(userProgressPath()).set({
+      progress,
+      updatedAt: firebase.database.ServerValue.TIMESTAMP,
+      appVersion: "review-progress-v2",
+    });
+    updateSyncStatus(`已同步：${currentUser.displayName || currentUser.email || "Google 帳號"}`);
+  } catch (error) {
+    updateSyncStatus(`同步失敗：${error.message}`);
+  }
+}
+
+async function readCloudProgress(user) {
+  const currentSnapshot = await firebaseDb.ref(userProgressPath(user.uid)).once("value");
+  const currentValue = currentSnapshot.val();
+  if (currentValue?.progress) return currentValue.progress;
+  if (currentValue && !currentValue.progress) return currentValue;
+
+  const legacySnapshot = await firebaseDb.ref(`procurementExamUsers/${user.uid}/progress`).once("value");
+  return legacySnapshot.val() || {};
+}
+
+async function loadProgressFromCloud(user) {
+  if (!firebaseDb) return;
+  isCloudLoading = true;
+  try {
+    updateSyncStatus("讀取雲端進度...");
+    const cloudProgress = await readCloudProgress(user);
+    progress = mergeProgress(progress, cloudProgress);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+    cloudReady = true;
+    isCloudLoading = false;
+    renderAll();
+    if (session.length) renderQuiz();
+    await pushProgressToCloud();
+  } catch (error) {
+    isCloudLoading = false;
+    cloudReady = false;
+    updateSyncStatus(`雲端讀取失敗：${error.message}`);
+  }
+}
+
+function initFirebaseSync() {
+  if (!$("#loginBtn") || !$("#logoutBtn")) return;
+  if (!window.firebase) {
+    updateSyncStatus("未載入同步服務，使用本機紀錄");
+    updateAuthControls();
+    return;
+  }
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    firebaseAuth = firebase.auth();
+    firebaseDb = firebase.database();
+    firebaseAuth.getRedirectResult().catch((error) => updateSyncStatus(authErrorMessage(error)));
+    firebaseAuth.onAuthStateChanged((user) => {
+      currentUser = user;
+      cloudReady = false;
+      clearTimeout(cloudSaveTimer);
+      updateAuthControls();
+      if (user) {
+        loadProgressFromCloud(user);
+        return;
+      }
+      updateSyncStatus("未登入，使用本機紀錄");
+    });
+  } catch (error) {
+    updateSyncStatus(`同步初始化失敗：${error.message}`);
+  }
+}
+
+async function loginWithGoogle() {
+  if (!firebaseAuth) {
+    updateSyncStatus("同步服務尚未初始化");
+    return;
+  }
+  const provider = googleProvider();
+  try {
+    updateSyncStatus("開啟 Google 登入...");
+    await firebaseAuth.signInWithPopup(provider);
+  } catch (error) {
+    if (["auth/popup-blocked", "auth/popup-closed-by-user", "auth/cancelled-popup-request"].includes(error.code)) {
+      updateSyncStatus("改用重新導向登入...");
+      await firebaseAuth.signInWithRedirect(provider);
+      return;
+    }
+    updateSyncStatus(authErrorMessage(error));
+  }
+}
+
+async function logout() {
+  if (!firebaseAuth) return;
+  await firebaseAuth.signOut();
 }
 
 function questionText(question) {
@@ -168,6 +351,106 @@ function extractReviewPoints(question) {
   return [...new Set([...keywords, ...numbers])].slice(0, 6);
 }
 
+function subjectInfo(question) {
+  return SUBJECTS.find((subject) => subject.id === question.subjectId) || {};
+}
+
+function textForLawBasis(question) {
+  const correctOption =
+    question.type === "choice" ? question.options?.[Number(question.answer) - 1] || "" : questionText(question);
+  return `${questionText(question)} ${question.raw || ""} ${correctOption} ${question.subject}`;
+}
+
+function procurementActLink(article) {
+  return `https://law.moj.gov.tw/LawClass/LawSingle.aspx?pcode=A0030057&flno=${encodeURIComponent(article)}`;
+}
+
+function extractExplicitLawReferences(question) {
+  const text = textForLawBasis(question);
+  const refs = [];
+  const rangeRegex = /(政府採購法|採購法)第\s*(\d+(?:之\d+)?)\s*條\s*(?:至|到|-)\s*第?\s*(\d+(?:之\d+)?)\s*條/g;
+  const articleRegex = /(政府採購法|採購法)第\s*(\d+(?:之\d+)?)\s*條/g;
+  let match;
+  while ((match = rangeRegex.exec(text))) {
+    refs.push({
+      label: `政府採購法第 ${match[2]} 條至第 ${match[3]} 條`,
+      url: procurementActLink(match[2]),
+    });
+  }
+  while ((match = articleRegex.exec(text))) {
+    const label = `政府採購法第 ${match[2]} 條`;
+    if (!refs.some((ref) => ref.label === label)) refs.push({ label, url: procurementActLink(match[2]) });
+  }
+  [
+    "政府採購法施行細則",
+    "招標期限標準",
+    "押標金保證金暨其他擔保作業辦法",
+    "最有利標評選辦法",
+    "採購評選委員會組織準則",
+    "採購評選委員會審議規則",
+    "採購契約要項",
+    "電子採購作業辦法",
+    "機關委託技術服務廠商評選及計費辦法",
+  ].forEach((name) => {
+    if (text.includes(name) && !refs.some((ref) => ref.label === name)) refs.push({ label: name });
+  });
+  return refs.slice(0, 4);
+}
+
+function inferLawBasis(question) {
+  const text = textForLawBasis(question);
+  const rules = [
+    { match: /異議|招標文件異議|採購申訴/, basis: "政府採購法第 74 條至第 86 條之 1：招標、審標、決標爭議的異議與申訴制度。" },
+    { match: /申訴|審議判斷|採購申訴審議/, basis: "政府採購法第 75 條至第 86 條之 1及採購申訴審議相關規定：申訴期間、審議程序與判斷效力。" },
+    { match: /調解|仲裁|履約爭議/, basis: "政府採購法第 85 條之 1至第 85 條之 4：履約爭議的調解、仲裁與後續處理。" },
+    { match: /停權|刊登|政府採購公報|拒絕往來|第101|第 101/, basis: "政府採購法第 101 條至第 103 條：通知廠商、刊登政府採購公報及停權期間效果。" },
+    { match: /罰則|圍標|借牌|綁標|刑責|第87|第 87/, basis: "政府採購法第 87 條至第 92 條：圍標、借牌、強迫、詐術等違法行為及罰則。" },
+    { match: /押標金|保證金|不予發還|追繳/, basis: "政府採購法第 30 條、第 31 條及押標金保證金暨其他擔保作業辦法：押標金、保證金與追繳/不發還事由。" },
+    { match: /底價|標價偏低|比減價|減價|超底價/, basis: "政府採購法第 46 條至第 58 條及施行細則決標規定：底價訂定、價格分析、減價與決標程序。" },
+    { match: /最有利標|評選|優勝廠商|協商|序位法/, basis: "政府採購法第 52 條、第 56 條、最有利標評選辦法及採購評選委員會相關規定：評選、協商與決標依據。" },
+    { match: /招標|公告|等標|公開招標|選擇性招標|限制性招標|廠商資格/, basis: "政府採購法第 18 條至第 38 條、施行細則及招標期限標準：招標方式、公告、等標期與投標資格。" },
+    { match: /決標|開標|審標|廢標|保留決標/, basis: "政府採購法第 45 條至第 62 條及施行細則決標規定：開標、審標、決標與廢標處理。" },
+    { match: /履約|驗收|保固|查驗|初驗|複驗/, basis: "政府採購法第 63 條至第 73 條及施行細則履約驗收規定：契約履行、驗收、保固與付款。" },
+    { match: /轉包|分包|連帶責任/, basis: "政府採購法第 65 條至第 67 條：轉包禁止、分包管理與得標廠商責任。" },
+    { match: /契約|契約變更|違約金|物價調整|契約價金/, basis: "政府採購法第 63 條、第 64 條、採購契約要項及工程採購契約範本：契約文件、變更、價金與違約責任。" },
+    { match: /電子|電子領標|電子投標|電子採購網|電子報價/, basis: "電子採購作業辦法及政府電子採購網作業規定：電子領標、投標、報價與系統紀錄效力。" },
+    { match: /技術服務|服務費用|建築師|監造|設計服務/, basis: "機關委託技術服務廠商評選及計費辦法：技術服務廠商評選、計費與履約管理。" },
+    { match: /統包|設計施工|功能需求/, basis: "統包實施辦法、政府採購法及工程採購契約相關規定：統包需求、評選與履約責任。" },
+  ];
+  return rules.filter((rule) => rule.match.test(text)).map((rule) => rule.basis).slice(0, 3);
+}
+
+function defaultSubjectLawBasis(question) {
+  const subject = subjectInfo(question);
+  const focus = subject.articleFocus || `${question.subject}相關採購法規、子法及作業規範。`;
+  const source = sourceFileName(question.source);
+  return [
+    `本科法規主軸：${focus}`,
+    `題庫依據：${source} 原題第 ${question.number} 題的標準答案。`,
+  ];
+}
+
+function lawBasisHTML(question) {
+  const explicitRefs = extractExplicitLawReferences(question);
+  const inferred = inferLawBasis(question);
+  const defaultBasis = defaultSubjectLawBasis(question);
+  const items = [
+    ...explicitRefs.map((ref) =>
+      ref.url
+        ? `<a class="law-link" href="${escapeHTML(ref.url)}" target="_blank" rel="noopener">${escapeHTML(ref.label)}</a>`
+        : escapeHTML(ref.label)
+    ),
+    ...inferred.map(escapeHTML),
+    ...defaultBasis.map(escapeHTML),
+  ];
+  const unique = [...new Set(items)].slice(0, 6);
+  return `
+    <div class="law-basis">
+      <strong>法規依據：</strong>
+      <ul>${unique.map((item) => `<li>${item}</li>`).join("")}</ul>
+    </div>`;
+}
+
 function explanationHTML(question) {
   const points = extractReviewPoints(question);
   const pointText = points.length ? points.join("、") : "題幹的主詞、條件、程序階段與法律效果";
@@ -184,6 +467,7 @@ function explanationHTML(question) {
         <h4>詳解</h4>
         <p><strong>題目問法：</strong>${escapeHTML(intent.label)}。${escapeHTML(intent.detail)}</p>
         <p><strong>正確答案：</strong>${escapeHTML(correct)}</p>
+        ${lawBasisHTML(question)}
         <p><strong>判斷方式：</strong>先抓本題關鍵點「${escapeHTML(pointText)}」，再回到題目問法判斷答案。若題目是排除式或找錯題，答案反而是那個「不符合」的選項；若題目問正確，答案就是最符合規定的敘述。</p>
         <p><strong>其他選項：</strong>${escapeHTML(otherText)}。這些不是本題標準答案，複習時可逐一對照題幹條件，確認它們為何較不符合題意。</p>
         <p><strong>複習提示：</strong>本題屬於「${escapeHTML(question.subject)}」，建議把關鍵字和來源 PDF 第 ${escapeHTML(question.number)} 題一起回看。</p>
@@ -197,6 +481,7 @@ function explanationHTML(question) {
     <div class="explanation-block">
       <h4>詳解</h4>
       <p><strong>標準答案：</strong>${escapeHTML(answerLabel(question))}</p>
+      ${lawBasisHTML(question)}
       <p><strong>判斷方式：</strong>${escapeHTML(correctText)}</p>
       <p><strong>本題關鍵：</strong>${escapeHTML(pointText)}。</p>
       <p><strong>複習提示：</strong>是非題要逐字看「得、應、不得、僅、免、即」這類字眼；若答案是 X，請特別回頭找題幹哪一段把規定說得太絕對、階段放錯或效果說反。</p>
@@ -546,6 +831,8 @@ function bindEvents() {
   $("#wrongBtn").addEventListener("click", () => startQuiz({ mode: "wrong" }));
   $("#refreshWrongBtn").addEventListener("click", renderWrongs);
   $("#searchInput").addEventListener("input", renderBank);
+  $("#loginBtn")?.addEventListener("click", loginWithGoogle);
+  $("#logoutBtn")?.addEventListener("click", logout);
   $("#exportBtn").addEventListener("click", exportProgress);
   $("#importBtn").addEventListener("click", () => $("#importFile").click());
   $("#importFile").addEventListener("change", (event) => {
@@ -565,3 +852,4 @@ function bindEvents() {
 setupSelectors();
 bindEvents();
 renderAll();
+initFirebaseSync();

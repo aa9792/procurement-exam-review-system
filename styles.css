@@ -123,6 +123,20 @@ h3 {
   justify-content: flex-end;
 }
 
+.sync-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  max-width: 260px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--muted);
+  padding: 8px 12px;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -316,6 +330,33 @@ select,
   line-height: 1.7;
 }
 
+.law-basis {
+  border: 1px solid #dbe5ff;
+  border-radius: 8px;
+  background: #f7f9ff;
+  padding: 10px 12px;
+}
+
+.law-basis ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+
+.law-basis li {
+  margin: 4px 0;
+  line-height: 1.65;
+}
+
+.law-link {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.law-link:hover {
+  text-decoration: underline;
+}
+
 .quiz-nav {
   justify-content: space-between;
   margin-top: 18px;
@@ -473,8 +514,10 @@ footer {
   }
 
   .header-actions button,
+  .sync-status,
   .quiz-nav button {
     width: 100%;
+    max-width: none;
   }
 
   .stats-grid,
