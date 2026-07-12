@@ -151,7 +151,11 @@ function updateSyncStatus(message) {
 }
 
 function updateAuthControls() {
-  $("#loginBtn")?.classList.toggle("hidden", !!currentUser);
+  const loginBtn = $("#loginBtn");
+  loginBtn?.classList.toggle("hidden", !!currentUser);
+  if (loginBtn && !currentUser) {
+    loginBtn.textContent = isUnsafeOAuthBrowser() ? "用 Chrome/Safari 開啟" : "Google 登入同步";
+  }
   $("#toggleEmailAuthBtn")?.classList.toggle("hidden", !!currentUser);
   $("#logoutBtn")?.classList.toggle("hidden", !currentUser);
   $("#emailAuthPanel")?.classList.toggle("hidden", !!currentUser || !$("#emailAuthPanel")?.dataset.open);
@@ -179,6 +183,7 @@ function androidChromeIntent(url) {
 
 function openInSystemBrowser() {
   const url = SITE_URL;
+  updateSyncStatus("請改用 Chrome/Safari 開啟後再按 Google 登入。");
   if (/Android/i.test(navigator.userAgent || "")) {
     window.location.href = androidChromeIntent(url);
     return;
@@ -194,6 +199,15 @@ function updateBrowserHelp() {
   help.classList.toggle("hidden", !showHelp);
   if (showHelp && !currentUser) {
     updateSyncStatus("請用 Chrome/Safari 開啟後登入");
+  }
+}
+
+async function copySiteLink() {
+  try {
+    await navigator.clipboard.writeText(SITE_URL);
+    updateSyncStatus("已複製網址，請貼到 Chrome/Safari 開啟。");
+  } catch {
+    updateSyncStatus("請手動複製頁面上的網址到 Chrome/Safari 開啟。");
   }
 }
 
@@ -293,6 +307,7 @@ function initFirebaseSync() {
   if (!window.firebase) {
     updateSyncStatus("未載入同步服務，使用本機紀錄");
     updateAuthControls();
+    updateBrowserHelp();
     return;
   }
   try {
@@ -347,6 +362,7 @@ async function loginWithGoogle() {
       return;
     }
     updateSyncStatus(authErrorMessage(error));
+    showEmailAuthPanel();
   }
 }
 
@@ -360,6 +376,13 @@ function toggleEmailAuthPanel() {
   if (!panel || currentUser) return;
   panel.dataset.open = panel.dataset.open ? "" : "1";
   panel.classList.toggle("hidden", !panel.dataset.open);
+}
+
+function showEmailAuthPanel() {
+  const panel = $("#emailAuthPanel");
+  if (!panel || currentUser) return;
+  panel.dataset.open = "1";
+  panel.classList.remove("hidden");
 }
 
 function emailAuthValues() {
@@ -955,6 +978,7 @@ function bindEvents() {
   $("#passwordResetBtn")?.addEventListener("click", resetEmailPassword);
   $("#logoutBtn")?.addEventListener("click", logout);
   $("#openBrowserBtn")?.addEventListener("click", openInSystemBrowser);
+  $("#copySiteLinkBtn")?.addEventListener("click", copySiteLink);
   $("#exportBtn").addEventListener("click", exportProgress);
   $("#importBtn").addEventListener("click", () => $("#importFile").click());
   $("#importFile").addEventListener("change", (event) => {
@@ -975,4 +999,5 @@ setupSelectors();
 bindEvents();
 renderAll();
 initFirebaseSync();
+updateAuthControls();
 updateBrowserHelp();

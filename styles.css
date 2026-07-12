@@ -155,7 +155,28 @@ h3 {
   line-height: 1.55;
 }
 
-.browser-help button {
+.browser-help a {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--accent);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.browser-help a:hover {
+  text-decoration: underline;
+}
+
+.browser-help-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.browser-help-actions button {
   flex: 0 0 auto;
 }
 
@@ -622,7 +643,8 @@ footer {
     flex-direction: column;
   }
 
-  .browser-help button {
+  .browser-help-actions,
+  .browser-help-actions button {
     width: 100%;
   }
 
