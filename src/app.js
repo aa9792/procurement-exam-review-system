@@ -1,5 +1,6 @@
 const DATA = window.EXAM_DATA || { questions: [], subjects: [], exam: {}, generatedAt: "" };
 const STORAGE_KEY = "procurement-review-progress-v2";
+const SITE_URL = "https://aa9792.github.io/procurement-exam-review-system/";
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyDFwKoHKw7iq2-tTzV9rx0fapYksunX6Wk",
   authDomain: "procurement-certification.firebaseapp.com",
@@ -154,6 +155,46 @@ function updateAuthControls() {
   $("#logoutBtn")?.classList.toggle("hidden", !currentUser);
 }
 
+function isMobileDevice() {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+}
+
+function isUnsafeOAuthBrowser() {
+  const ua = navigator.userAgent || "";
+  const vendor = navigator.vendor || "";
+  return (
+    /Line|FBAN|FBAV|FB_IAB|Instagram|MicroMessenger|Twitter|KAKAOTALK|LinkedInApp|GSA|DuckDuckGo/i.test(ua) ||
+    /;\s*wv\)|;\s*wv\b|Version\/[\d.]+\s+Chrome\/[\d.]+\s+Mobile\s+Safari/i.test(ua) ||
+    (/iPhone|iPad|iPod/i.test(ua) && !/Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS/i.test(ua)) ||
+    /Google Inc\./i.test(vendor) && /GSA/i.test(ua)
+  );
+}
+
+function androidChromeIntent(url) {
+  const target = new URL(url);
+  return `intent://${target.host}${target.pathname}${target.search}${target.hash}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(url)};end`;
+}
+
+function openInSystemBrowser() {
+  const url = SITE_URL;
+  if (/Android/i.test(navigator.userAgent || "")) {
+    window.location.href = androidChromeIntent(url);
+    return;
+  }
+  window.open(url, "_blank", "noopener");
+  updateSyncStatus("請在新開啟的瀏覽器頁面登入。");
+}
+
+function updateBrowserHelp() {
+  const help = $("#browserHelp");
+  if (!help) return;
+  const showHelp = isUnsafeOAuthBrowser() && !currentUser;
+  help.classList.toggle("hidden", !showHelp);
+  if (showHelp && !currentUser) {
+    updateSyncStatus("請用 Chrome/Safari 開啟後登入");
+  }
+}
+
 function authErrorMessage(error) {
   const host = window.location.hostname || "目前網域";
   if (error?.code === "auth/unauthorized-domain") {
@@ -161,6 +202,9 @@ function authErrorMessage(error) {
   }
   if (error?.code === "auth/operation-not-allowed") {
     return "登入失敗：Firebase 尚未啟用 Google 登入。";
+  }
+  if (error?.code === "auth/web-storage-unsupported") {
+    return "登入失敗：目前瀏覽器不支援登入儲存，請改用 Chrome 或 Safari。";
   }
   return `登入失敗：${error?.message || "請稍後再試"}`;
 }
@@ -244,6 +288,7 @@ function initFirebaseSync() {
       cloudReady = false;
       clearTimeout(cloudSaveTimer);
       updateAuthControls();
+      updateBrowserHelp();
       if (user) {
         loadProgressFromCloud(user);
         return;
@@ -260,9 +305,18 @@ async function loginWithGoogle() {
     updateSyncStatus("同步服務尚未初始化");
     return;
   }
+  if (isUnsafeOAuthBrowser()) {
+    updateBrowserHelp();
+    openInSystemBrowser();
+    return;
+  }
   const provider = googleProvider();
   try {
     updateSyncStatus("開啟 Google 登入...");
+    if (isMobileDevice()) {
+      await firebaseAuth.signInWithRedirect(provider);
+      return;
+    }
     await firebaseAuth.signInWithPopup(provider);
   } catch (error) {
     if (["auth/popup-blocked", "auth/popup-closed-by-user", "auth/cancelled-popup-request"].includes(error.code)) {
@@ -803,6 +857,7 @@ function bindEvents() {
   $("#searchInput").addEventListener("input", renderBank);
   $("#loginBtn")?.addEventListener("click", loginWithGoogle);
   $("#logoutBtn")?.addEventListener("click", logout);
+  $("#openBrowserBtn")?.addEventListener("click", openInSystemBrowser);
   $("#exportBtn").addEventListener("click", exportProgress);
   $("#importBtn").addEventListener("click", () => $("#importFile").click());
   $("#importFile").addEventListener("change", (event) => {
@@ -823,3 +878,4 @@ setupSelectors();
 bindEvents();
 renderAll();
 initFirebaseSync();
+updateBrowserHelp();

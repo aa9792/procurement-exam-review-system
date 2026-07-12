@@ -137,6 +137,28 @@ h3 {
   line-height: 1.35;
 }
 
+.browser-help {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 14px;
+  border: 1px solid #f0d3a2;
+  border-radius: 8px;
+  background: #fff8eb;
+  color: #5f3a00;
+  padding: 12px 14px;
+}
+
+.browser-help p {
+  margin-bottom: 0;
+  line-height: 1.55;
+}
+
+.browser-help button {
+  flex: 0 0 auto;
+}
+
 .page-tabs {
   display: flex;
   gap: 8px;
@@ -554,6 +576,15 @@ footer {
 
   .header-actions {
     justify-content: stretch;
+  }
+
+  .browser-help {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .browser-help button {
+    width: 100%;
   }
 
   .page-tabs .assistant-tab {
