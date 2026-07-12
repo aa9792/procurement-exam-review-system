@@ -222,6 +222,9 @@ function authErrorMessage(error) {
   if (error?.code === "auth/web-storage-unsupported") {
     return "登入失敗：目前瀏覽器不支援登入儲存，請改用 Chrome 或 Safari。";
   }
+  if (error?.code === "auth/missing-or-invalid-nonce" || /initial state|missing initial state|初始狀態/i.test(error?.message || "")) {
+    return "Google 登入失敗：瀏覽器封鎖 redirect 狀態。請重新開本頁後使用 Google popup，或改用 Email 登入。";
+  }
   if (error?.code === "auth/invalid-email") {
     return "登入失敗：Email 格式不正確。";
   }
@@ -316,7 +319,6 @@ function initFirebaseSync() {
     firebaseDb = firebase.database();
     firebaseAuth
       .setPersistence(firebase.auth.Auth.Persistence.LOCAL)
-      .then(() => firebaseAuth.getRedirectResult())
       .catch((error) => updateSyncStatus(authErrorMessage(error)))
       .finally(() => {
         firebaseAuth.onAuthStateChanged((user) => {
@@ -349,16 +351,12 @@ async function loginWithGoogle() {
   }
   const provider = googleProvider();
   try {
-    updateSyncStatus("開啟 Google 登入...");
-    if (isMobileDevice()) {
-      await firebaseAuth.signInWithRedirect(provider);
-      return;
-    }
+    updateSyncStatus("開啟 Google 登入視窗...");
     await firebaseAuth.signInWithPopup(provider);
   } catch (error) {
     if (["auth/popup-blocked", "auth/popup-closed-by-user", "auth/cancelled-popup-request"].includes(error.code)) {
-      updateSyncStatus("改用重新導向登入...");
-      await firebaseAuth.signInWithRedirect(provider);
+      updateSyncStatus("Google 登入視窗未完成，請允許彈出視窗或改用 Email 登入。");
+      showEmailAuthPanel();
       return;
     }
     updateSyncStatus(authErrorMessage(error));
