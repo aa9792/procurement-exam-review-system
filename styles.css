@@ -137,6 +137,49 @@ h3 {
   line-height: 1.35;
 }
 
+.page-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #e5ebf4;
+  padding: 6px;
+}
+
+.page-tabs a {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--ink);
+  padding: 8px 14px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.page-tabs a:hover {
+  border-color: var(--accent);
+  background: #fff;
+}
+
+.page-tabs .assistant-tab {
+  margin-left: auto;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+.page-tabs .assistant-tab:hover {
+  background: var(--accent-dark);
+  border-color: var(--accent-dark);
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -511,6 +554,10 @@ footer {
 
   .header-actions {
     justify-content: stretch;
+  }
+
+  .page-tabs .assistant-tab {
+    margin-left: 0;
   }
 
   .header-actions button,

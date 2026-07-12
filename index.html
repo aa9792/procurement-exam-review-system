@@ -24,6 +24,21 @@
     </header>
 
     <main>
+      <nav class="page-tabs" aria-label="功能分頁">
+        <a href="#practice">練習題</a>
+        <a href="#progress">科目進度</a>
+        <a href="#wrong-review">錯題複習</a>
+        <a href="#bank-search">題庫搜尋</a>
+        <a
+          class="assistant-tab"
+          href="https://gemini.google.com/gem/1CL4gw9ciot8KvZyw03xn5CK5sZaLI681?usp=sharing"
+          target="_blank"
+          rel="noopener"
+        >
+          解題助手
+        </a>
+      </nav>
+
       <section class="stats-grid" aria-label="題庫統計">
         <article class="stat-card">
           <span>真題總數</span>
@@ -43,7 +58,7 @@
         </article>
       </section>
 
-      <section class="layout">
+      <section id="practice" class="layout">
         <aside class="panel controls-panel">
           <h2>出題設定</h2>
           <label>
@@ -89,7 +104,7 @@
         </section>
       </section>
 
-      <section class="panel progress-panel">
+      <section id="progress" class="panel progress-panel">
         <div class="section-title">
           <h2>科目進度</h2>
           <p class="muted">依已作答題數統計，錯題做對後可在下方標記熟練。</p>
@@ -97,7 +112,7 @@
         <div id="subjectProgress" class="subject-list"></div>
       </section>
 
-      <section class="panel review-panel">
+      <section id="wrong-review" class="panel review-panel">
         <div class="section-title split">
           <div>
             <h2>錯題複習</h2>
@@ -108,7 +123,7 @@
         <div id="wrongList" class="question-list"></div>
       </section>
 
-      <section class="panel bank-panel">
+      <section id="bank-search" class="panel bank-panel">
         <div class="section-title split">
           <div>
             <h2>題庫搜尋</h2>
