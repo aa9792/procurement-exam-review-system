@@ -15,6 +15,7 @@
       <div class="header-actions">
         <span id="syncStatus" class="sync-status">未登入，使用本機紀錄</span>
         <button id="loginBtn" type="button">Google 登入同步</button>
+        <button id="toggleEmailAuthBtn" type="button">Email 登入/註冊</button>
         <button id="logoutBtn" class="hidden" type="button">登出</button>
         <button id="exportBtn" type="button">匯出進度</button>
         <button id="importBtn" type="button">匯入進度</button>
@@ -30,6 +31,28 @@
           <p>目前瀏覽器可能會被 Google 封鎖登入。請改用 Chrome、Safari 或系統瀏覽器開啟本頁後再登入；若按鈕無法跳出，請用右上角選單選「在瀏覽器中開啟」。</p>
         </div>
         <button id="openBrowserBtn" class="primary" type="button">用瀏覽器開啟</button>
+      </section>
+
+      <section id="emailAuthPanel" class="auth-card hidden" aria-live="polite">
+        <div>
+          <h2>Email 帳號同步</h2>
+          <p class="muted">Google 登入被手機封鎖時，可改用 Email 建立帳號並同步練習紀錄。</p>
+        </div>
+        <div class="auth-form">
+          <label>
+            Email
+            <input id="emailInput" type="email" autocomplete="email" placeholder="name@example.com" />
+          </label>
+          <label>
+            密碼
+            <input id="passwordInput" type="password" autocomplete="current-password" placeholder="至少 6 個字元" />
+          </label>
+          <div class="auth-actions">
+            <button id="emailLoginBtn" class="primary" type="button">登入</button>
+            <button id="emailRegisterBtn" type="button">註冊</button>
+            <button id="passwordResetBtn" type="button">忘記密碼</button>
+          </div>
+        </div>
       </section>
 
       <nav class="page-tabs" aria-label="功能分頁">
@@ -145,7 +168,7 @@
 
     <footer>
       <span id="generatedAt"></span>
-      <span>未登入時進度儲存在本機瀏覽器；Google 登入後會同步練習紀錄。</span>
+      <span>未登入時進度儲存在本機瀏覽器；Google 或 Email 登入後會同步練習紀錄。</span>
     </footer>
 
     <script src="./data/questions.js"></script>

@@ -159,6 +159,45 @@ h3 {
   flex: 0 0 auto;
 }
 
+.auth-card {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+
+.auth-card h2 {
+  margin-bottom: 6px;
+}
+
+.auth-form {
+  display: grid;
+  gap: 10px;
+}
+
+.auth-form label {
+  margin: 0;
+}
+
+.auth-form input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  padding: 8px 10px;
+}
+
+.auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .page-tabs {
   display: flex;
   gap: 8px;
@@ -584,6 +623,10 @@ footer {
   }
 
   .browser-help button {
+    width: 100%;
+  }
+
+  .auth-actions button {
     width: 100%;
   }
 

@@ -152,7 +152,9 @@ function updateSyncStatus(message) {
 
 function updateAuthControls() {
   $("#loginBtn")?.classList.toggle("hidden", !!currentUser);
+  $("#toggleEmailAuthBtn")?.classList.toggle("hidden", !!currentUser);
   $("#logoutBtn")?.classList.toggle("hidden", !currentUser);
+  $("#emailAuthPanel")?.classList.toggle("hidden", !!currentUser || !$("#emailAuthPanel")?.dataset.open);
 }
 
 function isMobileDevice() {
@@ -201,10 +203,25 @@ function authErrorMessage(error) {
     return `登入失敗：${host} 尚未加入 Firebase 授權網域。`;
   }
   if (error?.code === "auth/operation-not-allowed") {
-    return "登入失敗：Firebase 尚未啟用 Google 登入。";
+    return "登入失敗：Firebase 尚未啟用此登入方式。請到 Firebase Authentication 啟用 Google 或 Email/Password。";
   }
   if (error?.code === "auth/web-storage-unsupported") {
     return "登入失敗：目前瀏覽器不支援登入儲存，請改用 Chrome 或 Safari。";
+  }
+  if (error?.code === "auth/invalid-email") {
+    return "登入失敗：Email 格式不正確。";
+  }
+  if (["auth/invalid-credential", "auth/user-not-found", "auth/wrong-password"].includes(error?.code)) {
+    return "登入失敗：Email 或密碼不正確。";
+  }
+  if (error?.code === "auth/email-already-in-use") {
+    return "註冊失敗：這個 Email 已註冊，請直接登入或使用忘記密碼。";
+  }
+  if (error?.code === "auth/weak-password") {
+    return "註冊失敗：密碼至少需要 6 個字元。";
+  }
+  if (error?.code === "auth/too-many-requests") {
+    return "登入嘗試太多次，請稍後再試或使用忘記密碼。";
   }
   return `登入失敗：${error?.message || "請稍後再試"}`;
 }
@@ -282,19 +299,24 @@ function initFirebaseSync() {
     if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
     firebaseAuth = firebase.auth();
     firebaseDb = firebase.database();
-    firebaseAuth.getRedirectResult().catch((error) => updateSyncStatus(authErrorMessage(error)));
-    firebaseAuth.onAuthStateChanged((user) => {
-      currentUser = user;
-      cloudReady = false;
-      clearTimeout(cloudSaveTimer);
-      updateAuthControls();
-      updateBrowserHelp();
-      if (user) {
-        loadProgressFromCloud(user);
-        return;
-      }
-      updateSyncStatus("未登入，使用本機紀錄");
-    });
+    firebaseAuth
+      .setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+      .then(() => firebaseAuth.getRedirectResult())
+      .catch((error) => updateSyncStatus(authErrorMessage(error)))
+      .finally(() => {
+        firebaseAuth.onAuthStateChanged((user) => {
+          currentUser = user;
+          cloudReady = false;
+          clearTimeout(cloudSaveTimer);
+          updateAuthControls();
+          updateBrowserHelp();
+          if (user) {
+            loadProgressFromCloud(user);
+            return;
+          }
+          updateSyncStatus("未登入，使用本機紀錄");
+        });
+      });
   } catch (error) {
     updateSyncStatus(`同步初始化失敗：${error.message}`);
   }
@@ -331,6 +353,77 @@ async function loginWithGoogle() {
 async function logout() {
   if (!firebaseAuth) return;
   await firebaseAuth.signOut();
+}
+
+function toggleEmailAuthPanel() {
+  const panel = $("#emailAuthPanel");
+  if (!panel || currentUser) return;
+  panel.dataset.open = panel.dataset.open ? "" : "1";
+  panel.classList.toggle("hidden", !panel.dataset.open);
+}
+
+function emailAuthValues() {
+  return {
+    email: $("#emailInput")?.value.trim() || "",
+    password: $("#passwordInput")?.value || "",
+  };
+}
+
+function validateEmailAuthValues({ email, password }, requirePassword = true) {
+  if (!email) {
+    updateSyncStatus("請先輸入 Email。");
+    return false;
+  }
+  if (requirePassword && password.length < 6) {
+    updateSyncStatus("請輸入至少 6 個字元的密碼。");
+    return false;
+  }
+  return true;
+}
+
+async function loginWithEmail() {
+  if (!firebaseAuth) {
+    updateSyncStatus("同步服務尚未初始化");
+    return;
+  }
+  const values = emailAuthValues();
+  if (!validateEmailAuthValues(values)) return;
+  try {
+    updateSyncStatus("Email 登入中...");
+    await firebaseAuth.signInWithEmailAndPassword(values.email, values.password);
+  } catch (error) {
+    updateSyncStatus(authErrorMessage(error));
+  }
+}
+
+async function registerWithEmail() {
+  if (!firebaseAuth) {
+    updateSyncStatus("同步服務尚未初始化");
+    return;
+  }
+  const values = emailAuthValues();
+  if (!validateEmailAuthValues(values)) return;
+  try {
+    updateSyncStatus("建立 Email 帳號中...");
+    await firebaseAuth.createUserWithEmailAndPassword(values.email, values.password);
+  } catch (error) {
+    updateSyncStatus(authErrorMessage(error));
+  }
+}
+
+async function resetEmailPassword() {
+  if (!firebaseAuth) {
+    updateSyncStatus("同步服務尚未初始化");
+    return;
+  }
+  const values = emailAuthValues();
+  if (!validateEmailAuthValues(values, false)) return;
+  try {
+    await firebaseAuth.sendPasswordResetEmail(values.email);
+    updateSyncStatus("已寄出重設密碼信，請檢查信箱。");
+  } catch (error) {
+    updateSyncStatus(authErrorMessage(error));
+  }
 }
 
 function questionText(question) {
@@ -856,6 +949,10 @@ function bindEvents() {
   $("#refreshWrongBtn").addEventListener("click", renderWrongs);
   $("#searchInput").addEventListener("input", renderBank);
   $("#loginBtn")?.addEventListener("click", loginWithGoogle);
+  $("#toggleEmailAuthBtn")?.addEventListener("click", toggleEmailAuthPanel);
+  $("#emailLoginBtn")?.addEventListener("click", loginWithEmail);
+  $("#emailRegisterBtn")?.addEventListener("click", registerWithEmail);
+  $("#passwordResetBtn")?.addEventListener("click", resetEmailPassword);
   $("#logoutBtn")?.addEventListener("click", logout);
   $("#openBrowserBtn")?.addEventListener("click", openInSystemBrowser);
   $("#exportBtn").addEventListener("click", exportProgress);
