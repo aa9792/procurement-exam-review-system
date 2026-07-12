@@ -452,40 +452,10 @@ function lawBasisHTML(question) {
 }
 
 function explanationHTML(question) {
-  const points = extractReviewPoints(question);
-  const pointText = points.length ? points.join("、") : "題幹的主詞、條件、程序階段與法律效果";
-  if (question.type === "choice") {
-    const intent = choiceIntent(question);
-    const correct = answerLabel(question);
-    const otherOptions = (question.options || [])
-      .map((option, index) => ({ number: String(index + 1), text: option }))
-      .filter((option) => option.number !== String(question.answer))
-      .map((option) => `(${option.number}) ${option.text}`);
-    const otherText = otherOptions.length ? otherOptions.join("；") : "無";
-    return `
-      <div class="explanation-block">
-        <h4>詳解</h4>
-        <p><strong>題目問法：</strong>${escapeHTML(intent.label)}。${escapeHTML(intent.detail)}</p>
-        <p><strong>正確答案：</strong>${escapeHTML(correct)}</p>
-        ${lawBasisHTML(question)}
-        <p><strong>判斷方式：</strong>先抓本題關鍵點「${escapeHTML(pointText)}」，再回到題目問法判斷答案。若題目是排除式或找錯題，答案反而是那個「不符合」的選項；若題目問正確，答案就是最符合規定的敘述。</p>
-        <p><strong>其他選項：</strong>${escapeHTML(otherText)}。這些不是本題標準答案，複習時可逐一對照題幹條件，確認它們為何較不符合題意。</p>
-        <p><strong>複習提示：</strong>本題屬於「${escapeHTML(question.subject)}」，建議把關鍵字和來源 PDF 第 ${escapeHTML(question.number)} 題一起回看。</p>
-      </div>`;
-  }
-  const correctText =
-    question.answer === "O"
-      ? "題庫判定題幹敘述為正確，代表主詞、條件、程序或效果在本題語境下成立。"
-      : "題庫判定題幹敘述為錯誤，通常是期限、金額、程序階段、適用範圍或法律效果被改動。";
   return `
     <div class="explanation-block">
       <h4>詳解</h4>
-      <p><strong>標準答案：</strong>${escapeHTML(answerLabel(question))}</p>
       ${lawBasisHTML(question)}
-      <p><strong>判斷方式：</strong>${escapeHTML(correctText)}</p>
-      <p><strong>本題關鍵：</strong>${escapeHTML(pointText)}。</p>
-      <p><strong>複習提示：</strong>是非題要逐字看「得、應、不得、僅、免、即」這類字眼；若答案是 X，請特別回頭找題幹哪一段把規定說得太絕對、階段放錯或效果說反。</p>
-      <p><strong>來源：</strong>${escapeHTML(sourceFileName(question.source))}，原題第 ${escapeHTML(question.number)} 題。</p>
     </div>`;
 }
 
