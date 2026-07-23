@@ -3,56 +3,56 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>採購證照複習系統</title>
+    <meta name="theme-color" content="#101b2d" />
+    <title>採購勇者公會｜證照闖關複習</title>
+    <meta name="description" content="用角色技能、連擊與 Boss 挑戰，完成政府採購證照複習。" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <header class="app-header">
-      <div>
-        <p class="eyebrow">115 年政府採購專業人員基礎訓練</p>
-        <h1>採購證照複習系統</h1>
-      </div>
+      <a class="brand" href="#home" aria-label="回到冒險大廳">
+        <span class="brand-mark">採</span>
+        <span><small>PROCUREMENT GUILD</small><strong>採購勇者公會</strong></span>
+      </a>
+      <nav class="page-tabs" aria-label="主要功能">
+        <a href="#home">冒險大廳</a>
+        <a href="#practice">關卡</a>
+        <a href="#progress">戰績</a>
+        <a href="#wrong-review">錯題營地</a>
+        <a href="#bank-search">法典</a>
+      </nav>
       <div class="header-actions">
         <span id="syncStatus" class="sync-status">未登入，使用本機紀錄</span>
-        <button id="loginBtn" type="button">Google 登入同步</button>
-        <button id="toggleEmailAuthBtn" type="button">Email 登入/註冊</button>
-        <button id="logoutBtn" class="hidden" type="button">登出</button>
-        <button id="exportBtn" type="button">匯出進度</button>
-        <button id="importBtn" type="button">匯入進度</button>
-        <button id="clearBtn" type="button">清除紀錄</button>
+        <button id="loginBtn" type="button">登入同步</button>
+        <button id="toggleEmailAuthBtn" class="quiet-action" type="button">Email</button>
+        <button id="logoutBtn" class="hidden quiet-action" type="button">登出</button>
+        <details class="more-menu">
+          <summary aria-label="更多選項">•••</summary>
+          <div>
+            <button id="exportBtn" type="button">匯出進度</button>
+            <button id="importBtn" type="button">匯入進度</button>
+            <button id="clearBtn" class="danger-text" type="button">清除紀錄</button>
+          </div>
+        </details>
         <input id="importFile" class="hidden" type="file" accept="application/json" />
       </div>
     </header>
 
     <main>
       <section id="browserHelp" class="browser-help hidden" aria-live="polite">
-        <div>
-          <strong>手機登入提醒</strong>
-          <p>目前瀏覽器可能會被 Google 封鎖登入。請改用 Chrome、Safari 或系統瀏覽器開啟本頁後再登入；若按鈕無法跳出，請用右上角選單選「在瀏覽器中開啟」。</p>
-          <a id="browserLink" href="https://aa9792.github.io/procurement-exam-review-system/" target="_blank" rel="noopener">
-            https://aa9792.github.io/procurement-exam-review-system/
-          </a>
-        </div>
+        <div><strong>手機登入提醒</strong><p>請改用 Chrome、Safari 或系統瀏覽器開啟本頁後再登入。</p></div>
         <div class="browser-help-actions">
+          <a id="browserLink" class="text-link" href="https://aa9792.github.io/procurement-exam-review-system/" target="_blank" rel="noopener">開啟網站</a>
           <button id="openBrowserBtn" class="primary" type="button">用瀏覽器開啟</button>
           <button id="copySiteLinkBtn" type="button">複製網址</button>
         </div>
       </section>
 
       <section id="emailAuthPanel" class="auth-card hidden" aria-live="polite">
-        <div>
-          <h2>Email 帳號同步</h2>
-          <p class="muted">Google 登入被手機封鎖時，可改用 Email 建立帳號並同步練習紀錄。</p>
-        </div>
+        <div><h2>Email 帳號同步</h2><p class="muted">建立帳號即可跨裝置同步冒險進度。</p></div>
         <div class="auth-form">
-          <label>
-            Email
-            <input id="emailInput" type="email" autocomplete="email" placeholder="name@example.com" />
-          </label>
-          <label>
-            密碼
-            <input id="passwordInput" type="password" autocomplete="current-password" placeholder="至少 6 個字元" />
-          </label>
+          <label>Email<input id="emailInput" type="email" autocomplete="email" placeholder="name@example.com" /></label>
+          <label>密碼<input id="passwordInput" type="password" autocomplete="current-password" placeholder="至少 6 個字元" /></label>
           <div class="auth-actions">
             <button id="emailLoginBtn" class="primary" type="button">登入</button>
             <button id="emailRegisterBtn" type="button">註冊</button>
@@ -61,124 +61,108 @@
         </div>
       </section>
 
-      <nav class="page-tabs" aria-label="功能分頁">
-        <a href="#practice">練習題</a>
-        <a href="#progress">科目進度</a>
-        <a href="#wrong-review">錯題複習</a>
-        <a href="#bank-search">題庫搜尋</a>
-        <a
-          class="assistant-tab"
-          href="https://gemini.google.com/gem/1CL4gw9ciot8KvZyw03xn5CK5sZaLI681?usp=sharing"
-          target="_blank"
-          rel="noopener"
-        >
-          解題助手
-        </a>
-      </nav>
+      <section id="home" class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">115 年政府採購專業人員基礎訓練</p>
+          <h1>今天，再攻下一座<br /><em>採購法堡壘。</em></h1>
+          <p class="hero-lead">不是死背 3,599 題，而是把每一次錯誤變成下一次通關的線索。</p>
+          <div class="hero-actions">
+            <button id="continueBtn" class="primary large" type="button">繼續冒險 <span>→</span></button>
+            <a class="secondary-link" href="#wrong-review">複習錯題</a>
+          </div>
+          <div class="exam-countdown"><span>距離考試</span><strong id="countdownDays">—</strong><span>天</span><small>2026.08.02 · 基隆市政府</small></div>
+        </div>
 
-      <section class="stats-grid" aria-label="題庫統計">
-        <article class="stat-card">
-          <span>真題總數</span>
-          <strong id="totalQuestions">0</strong>
-        </article>
-        <article class="stat-card">
-          <span>已練題數</span>
-          <strong id="attemptedQuestions">0</strong>
-        </article>
-        <article class="stat-card">
-          <span>目前錯題</span>
-          <strong id="wrongQuestions">0</strong>
-        </article>
-        <article class="stat-card">
-          <span>假題檢查</span>
-          <strong id="placeholderCount">0</strong>
-        </article>
+        <aside class="character-card" aria-label="角色狀態">
+          <div class="character-top">
+            <span class="rank-badge" id="rankBadge">RANK F</span>
+            <div class="avatar" aria-hidden="true"><span>⚔</span></div>
+            <div><small>採購見習生</small><h2 id="heroLevel">Lv. 1 法典新兵</h2></div>
+          </div>
+          <div class="xp-block">
+            <div><span>經驗值</span><strong id="xpLabel">0 / 100 XP</strong></div>
+            <div class="bar xp-bar"><span id="xpBar" style="width:0%"></span></div>
+          </div>
+          <div class="character-stats">
+            <div><span>最高連擊</span><strong id="bestCombo">0</strong></div>
+            <div><span>Boss 徽章</span><strong id="badgeCount">0 / 14</strong></div>
+            <div><span>整體精熟</span><strong id="masteryRate">0%</strong></div>
+          </div>
+        </aside>
       </section>
 
-      <section id="practice" class="layout">
-        <aside class="panel controls-panel">
-          <h2>出題設定</h2>
-          <label>
-            科目
-            <select id="subjectSelect"></select>
-          </label>
-          <label>
-            題型
-            <select id="typeSelect">
-              <option value="all">選擇 + 是非</option>
-              <option value="choice">只練選擇題</option>
-              <option value="tf">只是非題</option>
-            </select>
-          </label>
-          <label>
-            模式
-            <select id="modeSelect">
-              <option value="unseen">未練題優先</option>
-              <option value="random">隨機練習</option>
-              <option value="wrong">錯題複習</option>
-            </select>
-          </label>
-          <label>
-            題數
-            <select id="countSelect">
-              <option value="10">10 題</option>
-              <option value="20" selected>20 題</option>
-              <option value="30">30 題</option>
-              <option value="50">50 題</option>
-            </select>
-          </label>
-          <button id="startBtn" class="primary full" type="button">開始複習</button>
-          <button id="wrongBtn" class="full" type="button">直接練錯題</button>
-          <p id="poolInfo" class="muted"></p>
-        </aside>
+      <section class="mission-strip" aria-label="今日任務">
+        <div><span class="mission-icon">✦</span><div><small>今日任務</small><strong id="dailyMission">完成 20 題練習</strong></div></div>
+        <div class="mission-progress"><div class="bar"><span id="dailyBar" style="width:0%"></span></div><strong id="dailyLabel">0 / 20</strong></div>
+        <div class="weakness"><small>目前弱點</small><strong id="weakSubject">尚未發現，先開始一回練習</strong></div>
+      </section>
 
-        <section class="panel quiz-panel">
-          <div id="quizIntro" class="empty-state">
-            <h2>選科目後開始練習</h2>
-            <p>此頁只會使用本資料夾 `data/questions.js` 內的 3599 題真題，不再產生或顯示模擬占位題。</p>
-          </div>
-          <div id="quizArea" class="hidden"></div>
-        </section>
+      <section id="practice" class="adventure-section">
+        <div class="section-heading">
+          <div><p class="eyebrow">CHAPTER SELECT</p><h2>選擇你的下一場戰役</h2></div>
+          <div class="legend"><span><i class="dot open"></i>可挑戰</span><span><i class="dot boss"></i>Boss 已解鎖</span><span><i class="dot clear"></i>已通關</span></div>
+        </div>
+        <div id="chapterMap" class="chapter-map"></div>
+
+        <div class="battle-layout">
+          <aside class="panel controls-panel">
+            <div><p class="eyebrow">BATTLE SETUP</p><h2>出戰設定</h2></div>
+            <label>科目<select id="subjectSelect"></select></label>
+            <div class="field-grid">
+              <label>題型<select id="typeSelect"><option value="all">選擇＋是非</option><option value="choice">選擇題</option><option value="tf">是非題</option></select></label>
+              <label>題數<select id="countSelect"><option value="10">10 題</option><option value="20" selected>20 題</option><option value="30">30 題</option><option value="50">50 題</option></select></label>
+            </div>
+            <label>模式<select id="modeSelect"><option value="unseen">未練題優先</option><option value="random">隨機練習</option><option value="wrong">錯題特訓</option></select></label>
+            <button id="startBtn" class="primary full" type="button">開始一般關卡</button>
+            <button id="bossBtn" class="boss-button full" type="button">挑戰章末 Boss</button>
+            <button id="wrongBtn" class="full" type="button">直接練錯題</button>
+            <p id="poolInfo" class="muted"></p>
+          </aside>
+
+          <section class="panel quiz-panel">
+            <div id="quizIntro" class="empty-state intro-state">
+              <span class="seal">QUEST</span>
+              <h2>選擇科目，開始今日試煉</h2>
+              <p>一般關達 80% 即可解鎖該科 Boss。答錯不用怕，系統會把弱點帶回錯題營地。</p>
+              <div class="skill-preview">
+                <span>⚔ 刪去術</span><span>⌘ 法典提示</span><span>◇ 守護盾</span><span>◎ 洞察</span>
+              </div>
+            </div>
+            <div id="quizArea" class="hidden"></div>
+          </section>
+        </div>
       </section>
 
       <section id="progress" class="panel progress-panel">
-        <div class="section-title">
-          <h2>科目進度</h2>
-          <p class="muted">依已作答題數統計，錯題做對後可在下方標記熟練。</p>
+        <div class="section-heading compact">
+          <div><p class="eyebrow">BATTLE RECORDS</p><h2>十四科戰績</h2></div>
+          <div class="summary-pills"><span>作答 <strong id="attemptedQuestions">0</strong></span><span>錯題 <strong id="wrongQuestions">0</strong></span><span>題庫 <strong id="totalQuestions">0</strong></span><span class="hidden">假題 <strong id="placeholderCount">0</strong></span></div>
         </div>
         <div id="subjectProgress" class="subject-list"></div>
       </section>
 
       <section id="wrong-review" class="panel review-panel">
-        <div class="section-title split">
-          <div>
-            <h2>錯題複習</h2>
-            <p class="muted">答錯且尚未標記熟練的題目會出現在這裡。</p>
-          </div>
-          <button id="refreshWrongBtn" type="button">更新錯題</button>
+        <div class="section-heading compact">
+          <div><p class="eyebrow">TRAINING CAMP</p><h2>錯題營地</h2><p class="muted">反覆答錯與標記「仍不懂」的題目，都會留在這裡。</p></div>
+          <button id="refreshWrongBtn" type="button">更新營地</button>
         </div>
         <div id="wrongList" class="question-list"></div>
       </section>
 
       <section id="bank-search" class="panel bank-panel">
-        <div class="section-title split">
-          <div>
-            <h2>題庫搜尋</h2>
-            <p class="muted">可搜尋關鍵字、科目名稱或題目文字。</p>
-          </div>
-          <input id="searchInput" class="search" type="search" placeholder="輸入關鍵字" />
+        <div class="section-heading compact">
+          <div><p class="eyebrow">ARCHIVE</p><h2>法典題庫</h2></div>
+          <input id="searchInput" class="search" type="search" placeholder="搜尋法條、科目或題目關鍵字" />
         </div>
         <div id="bankList" class="question-list"></div>
       </section>
     </main>
 
-    <footer>
-      <span id="generatedAt"></span>
-      <span>未登入時進度儲存在本機瀏覽器；Google 或 Email 登入後會同步練習紀錄。</span>
-    </footer>
+    <footer><span id="generatedAt"></span><span>進度儲存在本機；登入後可同步至其他裝置。</span></footer>
 
     <script src="./data/questions.js"></script>
     <script src="./data/chapter-charts.js"></script>
+    <script src="./src/game-rules.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
