@@ -1,11 +1,4 @@
 const DATA = window.EXAM_DATA || { questions: [], subjects: [], exam: {}, generatedAt: "" };
-const GAME_RULES = window.GAME_RULES || {
-  CLEAR_RATE: 80,
-  BOSS_LIVES: 3,
-  comboMultiplier: (value) => (value >= 10 ? 2 : value >= 5 ? 1.5 : value >= 3 ? 1.25 : 1),
-  passed: (rate, answered, total) => total > 0 && answered === total && rate >= 80,
-  levelForXp: (xp) => Math.floor(Number(xp || 0) / 100) + 1,
-};
 const STORAGE_KEY = "procurement-review-progress-v2";
 const SITE_URL = "https://aa9792.github.io/procurement-exam-review-system/";
 const FIREBASE_CONFIG = {
@@ -77,16 +70,6 @@ let progress = loadProgress();
 let session = [];
 let sessionIndex = 0;
 let sessionAnswers = {};
-let sessionMode = "practice";
-let sessionStartedAt = 0;
-let combo = 0;
-let maxSessionCombo = 0;
-let bossLives = 3;
-let bossHp = 10;
-let activeSkills = {};
-let eliminatedChoice = "";
-let insightActive = false;
-let hintVisible = false;
 let firebaseAuth = null;
 let firebaseDb = null;
 let currentUser = null;
@@ -127,8 +110,6 @@ function normalizeProgressItem(item = {}) {
     mastered: !!item.mastered,
     lastAnswer: item.lastAnswer || "",
     lastAt: item.lastAt || "",
-    assistedCorrect: Number(item.assistedCorrect || 0),
-    cleanCorrect: Number(item.cleanCorrect || 0),
   };
 }
 
@@ -136,21 +117,6 @@ function mergeProgress(localProgress = {}, cloudProgress = {}) {
   const merged = {};
   const ids = new Set([...Object.keys(localProgress || {}), ...Object.keys(cloudProgress || {})]);
   ids.forEach((id) => {
-    if (id === "__game") {
-      const localGame = localProgress?.__game || {};
-      const cloudGame = cloudProgress?.__game || {};
-      merged.__game = {
-        ...cloudGame,
-        ...localGame,
-        xp: Math.max(Number(localGame.xp || 0), Number(cloudGame.xp || 0)),
-        bestCombo: Math.max(Number(localGame.bestCombo || 0), Number(cloudGame.bestCombo || 0)),
-        badges: { ...(cloudGame.badges || {}), ...(localGame.badges || {}) },
-        chapterRates: { ...(cloudGame.chapterRates || {}), ...(localGame.chapterRates || {}) },
-        confused: { ...(cloudGame.confused || {}), ...(localGame.confused || {}) },
-        daily: { ...(cloudGame.daily || {}), ...(localGame.daily || {}) },
-      };
-      return;
-    }
     const hasLocal = !!localProgress?.[id];
     const hasCloud = !!cloudProgress?.[id];
     if (!hasLocal && !hasCloud) return;
@@ -174,32 +140,9 @@ function mergeProgress(localProgress = {}, cloudProgress = {}) {
       mastered: localItem.mastered || cloudItem.mastered,
       lastAnswer: newer.lastAnswer || localItem.lastAnswer || cloudItem.lastAnswer || "",
       lastAt: newer.lastAt || localItem.lastAt || cloudItem.lastAt || "",
-      assistedCorrect: Math.max(localItem.assistedCorrect, cloudItem.assistedCorrect),
-      cleanCorrect: Math.max(localItem.cleanCorrect, cloudItem.cleanCorrect),
     };
   });
   return merged;
-}
-
-function gameState() {
-  const raw = progress.__game || {};
-  return {
-    xp: Number(raw.xp || 0),
-    bestCombo: Number(raw.bestCombo || 0),
-    badges: raw.badges || {},
-    chapterRates: raw.chapterRates || {},
-    confused: raw.confused || {},
-    assistedCorrect: Number(raw.assistedCorrect || 0),
-    cleanCorrect: Number(raw.cleanCorrect || 0),
-    daily: raw.daily || {},
-    lastSubject: raw.lastSubject || "02",
-  };
-}
-
-function updateGameState(patch) {
-  const current = gameState();
-  progress.__game = { ...current, ...patch };
-  saveProgress();
 }
 
 function updateSyncStatus(message) {
@@ -677,36 +620,16 @@ function lawBasisHTML(question) {
 }
 
 function explanationHTML(question) {
-  const subject = subjectInfo(question);
-  const points = extractReviewPoints(question);
-  const intent = choiceIntent(question);
-  const isPrecise = !!(question.preciseExplanation || question.isBoss || question.boss);
-  const reason =
-    question.preciseExplanation ||
-    (question.type === "choice"
-      ? `${intent.detail} 本題依題庫標準答案，應選「${answerLabel(question)}」。`
-      : `本題敘述依題庫標準答案判定為「${answerLabel(question)}」，複習時請先確認主詞、條件及法律效果是否全部成立。`);
-  const misconception =
-    question.misconception ||
-    (points.length
-      ? `常見失誤是只看到「${points.slice(0, 2).join("、")}」就作答，忽略題目是否要求找出例外、錯誤敘述或特定程序階段。`
-      : "常見失誤是只記住結論，卻忽略題目的主詞、適用條件與例外規定。");
-  const memory = question.memoryTip || subject.notes?.[0] || subject.articleFocus || "先判斷採購階段，再核對條件與法律效果。";
   return `
     <div class="explanation-block">
-      <span class="explanation-tier">${isPrecise ? "精準解析 · 已標記核心題" : "章節提示 · 待逐題人工校對"}</span>
-      <h4>${isPrecise ? "解題解析" : "本題複習線索"}</h4>
-      <p><strong>為什麼：</strong>${escapeHTML(reason)}</p>
-      <p><strong>常見迷思：</strong>${escapeHTML(misconception)}</p>
-      ${points.length ? `<div class="review-points">${points.map((point) => `<span>${escapeHTML(point)}</span>`).join("")}</div>` : ""}
-      <p><strong>速記：</strong>${escapeHTML(memory)}</p>
+      <h4>詳解</h4>
       ${lawBasisHTML(question)}
     </div>`;
 }
 
 function isWrongQuestion(question) {
   const item = statsFor(question.id);
-  return (item.wrong > 0 && !item.mastered) || !!gameState().confused[question.id];
+  return item.wrong > 0 && !item.mastered;
 }
 
 function subjectMatches(question, selection) {
@@ -759,56 +682,11 @@ function pickQuestions() {
   return pool.filter((question) => !isPlaceholderQuestion(question)).slice(0, count);
 }
 
-function selectedSubjectId() {
-  const value = $("#subjectSelect").value;
-  if (SUBJECTS.some((subject) => subject.id === value)) return value;
-  return gameState().lastSubject || SUBJECTS[0]?.id;
-}
-
-function subjectBossUnlocked(subjectId) {
-  return Number(gameState().chapterRates[subjectId] || 0) >= 80;
-}
-
-function bossQuestionPool(subjectId) {
-  const pool = QUESTIONS.filter((question) => question.subjectId === subjectId);
-  const wrong = shuffle(pool.filter(isWrongQuestion));
-  const core = pool.filter((question) => question.isBoss || question.boss || question.importance === "high");
-  const misconception = pool.filter((question) => /不得|應|非|錯誤|期限|金額|日|年/.test(questionText(question)));
-  return [...new Map([...wrong, ...shuffle(core), ...shuffle(misconception), ...shuffle(pool)].map((question) => [question.id, question])).values()].slice(0, 10);
-}
-
-function resetBattleState(mode) {
-  sessionMode = mode;
+function startQuiz(overrides = {}) {
+  if (overrides.mode) $("#modeSelect").value = overrides.mode;
+  session = pickQuestions();
   sessionIndex = 0;
   sessionAnswers = {};
-  sessionStartedAt = Date.now();
-  combo = 0;
-  maxSessionCombo = 0;
-  bossLives = 3;
-  bossHp = session.length;
-  activeSkills = { eliminate: 1, hint: 2, shield: 1, insight: 1 };
-  eliminatedChoice = "";
-  insightActive = false;
-  hintVisible = false;
-}
-
-function startQuiz(overrides = {}) {
-  if (overrides.subject) $("#subjectSelect").value = overrides.subject;
-  if (overrides.mode) $("#modeSelect").value = overrides.mode;
-  const mode = overrides.boss ? "boss" : "practice";
-  const subjectId = selectedSubjectId();
-  if (mode === "boss") {
-    if (!subjectBossUnlocked(subjectId)) {
-      alert("先在此科一般關卡取得 80% 以上正確率，才能挑戰章末 Boss。");
-      return;
-    }
-    session = bossQuestionPool(subjectId);
-  } else {
-    session = pickQuestions();
-  }
-  updateGameState({ lastSubject: subjectId });
-  resetBattleState(mode);
-  sessionIndex = 0;
   $("#quizIntro").classList.add("hidden");
   $("#quizArea").classList.remove("hidden");
   renderQuiz();
@@ -818,78 +696,21 @@ function startQuiz(overrides = {}) {
 function recordAnswer(question, answer) {
   if (sessionAnswers[question.id]) return;
   const correct = answer === question.answer;
-  const usedSkill = !!activeSkills.currentAssisted;
-  const shielded = !correct && sessionMode === "boss" && activeSkills.shield?.armed;
-  if (correct) {
-    combo += 1;
-    maxSessionCombo = Math.max(maxSessionCombo, combo);
-    if (sessionMode === "boss") bossHp = Math.max(0, bossHp - 1);
-  } else {
-    combo = 0;
-    if (sessionMode === "boss" && !shielded) bossLives = Math.max(0, bossLives - 1);
-  }
-  const multiplier = GAME_RULES.comboMultiplier(combo);
-  const earnedXp = correct ? Math.round(10 * multiplier) : 2;
   const item = normalizeProgressItem(progress[question.id]);
   item.attempts += 1;
   item.lastAnswer = answer;
   item.lastAt = new Date().toISOString();
   if (correct) {
     item.correct += 1;
-    item.assistedCorrect = Number(item.assistedCorrect || 0) + (usedSkill ? 1 : 0);
-    item.cleanCorrect = Number(item.cleanCorrect || 0) + (usedSkill ? 0 : 1);
   } else {
     item.wrong += 1;
     item.mastered = false;
   }
   progress[question.id] = item;
-  const game = gameState();
-  const today = new Date().toISOString().slice(0, 10);
-  const daily = { ...game.daily };
-  daily[today] = Number(daily[today] || 0) + 1;
-  progress.__game = {
-    ...game,
-    xp: game.xp + earnedXp,
-    bestCombo: Math.max(game.bestCombo, maxSessionCombo),
-    assistedCorrect: game.assistedCorrect + (correct && usedSkill ? 1 : 0),
-    cleanCorrect: game.cleanCorrect + (correct && !usedSkill ? 1 : 0),
-    daily,
-  };
-  sessionAnswers[question.id] = { answer, correct, usedSkill, shielded, earnedXp, combo };
-  if (activeSkills.shield) activeSkills.shield.armed = false;
-  Object.values(activeSkills).forEach((skill) => { if (skill && typeof skill === "object") skill.usedOnCurrent = false; });
+  sessionAnswers[question.id] = { answer, correct };
   saveProgress();
   renderAll(false);
   renderQuiz();
-}
-
-function highlightQuestionText(text) {
-  const escaped = escapeHTML(text);
-  if (!insightActive) return escaped;
-  return escaped.replace(/(應|得|不得|非屬|錯誤|正確|\d+\s*(?:日|天|個月|年|%|％|萬元|億元))/g, "<mark>$1</mark>");
-}
-
-function useSkill(name, question) {
-  if (sessionAnswers[question.id] || !activeSkills[name] || activeSkills[name] <= 0) return;
-  if (name === "eliminate") {
-    const choices = question.type === "choice"
-      ? question.options.map((_, index) => String(index + 1)).filter((value) => value !== question.answer)
-      : [];
-    if (!choices.length) return;
-    eliminatedChoice = choices[Math.floor(Math.random() * choices.length)];
-  }
-  if (name === "hint") hintVisible = true;
-  if (name === "shield") activeSkills.shield = { armed: true, usedOnCurrent: true };
-  if (name === "insight") insightActive = true;
-  if (typeof activeSkills[name] === "number") activeSkills[name] -= 1;
-  if (typeof activeSkills[name] === "number") activeSkills[`${name}Used`] = (activeSkills[`${name}Used`] || 0) + 1;
-  activeSkills[name] = typeof activeSkills[name] === "object" ? activeSkills[name] : activeSkills[name];
-  activeSkills.currentAssisted = true;
-  renderQuiz();
-}
-
-function skillCount(name) {
-  return typeof activeSkills[name] === "number" ? activeSkills[name] : activeSkills[name]?.armed ? 0 : 0;
 }
 
 function renderQuiz() {
@@ -908,7 +729,6 @@ function renderQuiz() {
 
   const question = session[sessionIndex];
   const result = sessionAnswers[question.id];
-  const subject = subjectInfo(question);
   const choices =
     question.type === "choice"
       ? question.options.map((option, index) => ({
@@ -921,18 +741,6 @@ function renderQuiz() {
         ];
 
   area.innerHTML = `
-    <div class="battle-hud">
-      <div class="battle-title">
-        <strong>${sessionMode === "boss" ? `BOSS · ${escapeHTML(question.subject)}` : "一般關卡"}</strong>
-        <span class="muted">${sessionMode === "boss" ? "章末能力檢定" : "累積 80% 正確率解鎖 Boss"}</span>
-      </div>
-      <div class="hud-stats">
-        <span class="hud-stat">🔥 Combo <b>${combo}</b></span>
-        <span class="hud-stat">最高 <b>${maxSessionCombo}</b></span>
-        ${sessionMode === "boss" ? `<span class="hud-stat">生命 <b>${"♥".repeat(bossLives)}${"♡".repeat(3 - bossLives)}</b></span>` : ""}
-      </div>
-      ${sessionMode === "boss" ? `<div class="boss-health"><span>BOSS HP</span><div class="bar"><span style="width:${Math.round((bossHp / session.length) * 100)}%"></span></div><strong>${bossHp} / ${session.length}</strong></div>` : ""}
-    </div>
     <div class="quiz-top">
       <div>
         <strong>題目 ${sessionIndex + 1} / ${session.length}</strong>
@@ -945,14 +753,7 @@ function renderQuiz() {
       </div>
       <span class="muted">已練 ${statsFor(question.id).attempts} 次</span>
     </div>
-    <p class="question-stem">${highlightQuestionText(questionText(question))}</p>
-    <div class="skill-bar" aria-label="角色技能">
-      <button class="skill-button" data-skill="eliminate" type="button" ${result || question.type !== "choice" || skillCount("eliminate") < 1 ? "disabled" : ""}>⚔ 刪去術 ×${skillCount("eliminate")}</button>
-      <button class="skill-button" data-skill="hint" type="button" ${result || skillCount("hint") < 1 ? "disabled" : ""}>⌘ 法典提示 ×${skillCount("hint")}</button>
-      <button class="skill-button ${activeSkills.shield?.armed ? "used" : ""}" data-skill="shield" type="button" ${result || sessionMode !== "boss" || activeSkills.shield?.armed ? "disabled" : ""}>◇ 守護盾 ×${activeSkills.shield?.armed ? 0 : 1}</button>
-      <button class="skill-button ${insightActive ? "used" : ""}" data-skill="insight" type="button" ${result || insightActive || skillCount("insight") < 1 ? "disabled" : ""}>◎ 洞察 ×${skillCount("insight")}</button>
-    </div>
-    ${hintVisible && !result ? `<div class="hint-box"><strong>法典提示：</strong>${escapeHTML(subject.articleFocus || subject.notes?.[0] || "先判斷本題所屬採購階段，再注意條件與例外。")}</div>` : ""}
+    <p class="question-stem">${escapeHTML(questionText(question))}</p>
     <div class="options ${question.type === "tf" ? "tf-options" : ""}"></div>
     <div id="answerBox" class="${result ? `answer-box ${result.correct ? "is-correct" : "is-wrong"}` : "hidden"}"></div>
     <div class="quiz-nav">
@@ -966,10 +767,6 @@ function renderQuiz() {
     button.type = "button";
     button.className = "option";
     button.textContent = choice.label;
-    if (!result && choice.value === eliminatedChoice) {
-      button.disabled = true;
-      button.classList.add("is-eliminated");
-    }
     if (result) {
       button.disabled = true;
       if (choice.value === question.answer) button.classList.add("is-correct");
@@ -981,46 +778,21 @@ function renderQuiz() {
 
   if (result) {
     $("#answerBox").innerHTML = `
-      <div class="feedback-banner">
-        <strong>${result.correct ? "答對，攻擊成功！" : result.shielded ? "答錯，但守護盾擋下傷害。" : "答錯，記住這個陷阱。"}</strong>
-        <span class="feedback-rewards">+${result.earnedXp} XP · ${result.combo >= 2 ? `${result.combo} COMBO` : "連擊重新累積"}</span>
-      </div>
+      <strong>${result.correct ? "答對。" : "答錯。"}</strong>
       你的答案：${escapeHTML(answerLabel(question, result.answer))}<br>
       標準答案：${escapeHTML(answerLabel(question))}<br>
-      <span class="mini-tag">${result.correct ? (result.usedSkill ? "輔助答對" : "完全答對") : "加入錯題營地"}</span><br>
       <span class="source-path">來源：${escapeHTML(question.source)}</span>
       ${explanationHTML(question)}`;
-    $("#answerBox").insertAdjacentHTML("beforeend", `<button id="confusedBtn" class="confused" type="button">仍不懂，加入待複習</button>`);
-    $("#confusedBtn").addEventListener("click", () => {
-      const game = gameState();
-      updateGameState({ confused: { ...game.confused, [question.id]: true } });
-      $("#confusedBtn").textContent = "已加入待複習";
-      $("#confusedBtn").disabled = true;
-    });
   }
 
-  area.querySelectorAll("[data-skill]").forEach((button) => {
-    button.addEventListener("click", () => useSkill(button.dataset.skill, question));
-  });
   $("#prevBtn").disabled = sessionIndex === 0;
   $("#prevBtn").addEventListener("click", () => {
     sessionIndex -= 1;
-    eliminatedChoice = "";
-    insightActive = false;
-    hintVisible = false;
     renderQuiz();
   });
   $("#nextBtn").addEventListener("click", () => {
-    if (sessionMode === "boss" && bossLives === 0) {
-      renderSessionResult();
-      return;
-    }
     if (sessionIndex < session.length - 1) {
       sessionIndex += 1;
-      eliminatedChoice = "";
-      insightActive = false;
-      hintVisible = false;
-      activeSkills.currentAssisted = false;
       renderQuiz();
       return;
     }
@@ -1031,119 +803,36 @@ function renderQuiz() {
 function renderSessionResult() {
   const answered = Object.values(sessionAnswers);
   const correct = answered.filter((item) => item.correct).length;
-  const rate = session.length ? Math.round((correct / session.length) * 100) : 0;
-  const elapsed = Math.max(1, Math.round((Date.now() - sessionStartedAt) / 60000));
-  const subjectId = selectedSubjectId();
-  const game = gameState();
-  const passed = GAME_RULES.passed(rate, answered.length, session.length);
-  const chapterRates = { ...game.chapterRates };
-  const badges = { ...game.badges };
-  if (sessionMode === "practice") chapterRates[subjectId] = Math.max(Number(chapterRates[subjectId] || 0), rate);
-  if (sessionMode === "boss" && passed) badges[subjectId] = true;
-  progress.__game = { ...game, chapterRates, badges, xp: game.xp + (passed ? (sessionMode === "boss" ? 100 : 30) : 0) };
-  saveProgress();
   $("#quizArea").innerHTML = `
     <div class="empty-state">
-      <span class="seal">${passed ? "CLEAR" : "RETRY"}</span>
-      <h2>${passed ? (sessionMode === "boss" ? "Boss 擊破，徽章入手！" : "關卡通過，Boss 已解鎖！") : "尚未達到 80% 通關門檻"}</h2>
-      <p>${passed ? "很好，把今天的手感帶進下一場戰役。" : "系統已把錯題送回營地，針對弱點再練一回就能更接近通關。"}</p>
-      <div class="result-grid">
-        <div><span>正確率</span><strong>${rate}%</strong></div>
-        <div><span>最高連擊</span><strong>${maxSessionCombo}</strong></div>
-        <div><span>作答時間</span><strong>${elapsed} 分</strong></div>
-        <div><span>技能使用</span><strong>${answered.filter((item) => item.usedSkill).length}</strong></div>
-      </div>
+      <h2>本回完成</h2>
+      <p>已作答 ${answered.length} / ${session.length} 題，答對 ${correct} 題。</p>
       <div class="card-actions">
         <button id="againBtn" class="primary" type="button">再練一回</button>
         <button id="reviewWrongSessionBtn" type="button">練錯題</button>
-        ${sessionMode === "practice" && passed ? `<button id="resultBossBtn" class="boss-button" type="button">挑戰 Boss</button>` : ""}
       </div>
     </div>`;
   $("#againBtn").addEventListener("click", () => startQuiz());
   $("#reviewWrongSessionBtn").addEventListener("click", () => startQuiz({ mode: "wrong" }));
-  $("#resultBossBtn")?.addEventListener("click", () => startQuiz({ boss: true }));
-  renderAll(false);
 }
 
 function renderStats() {
   const attempted = QUESTIONS.filter((question) => statsFor(question.id).attempts > 0).length;
   const wrong = QUESTIONS.filter(isWrongQuestion).length;
-  const game = gameState();
-  const level = GAME_RULES.levelForXp(game.xp);
-  const levelXp = game.xp % 100;
-  const badgeCount = Object.values(game.badges).filter(Boolean).length;
-  const totalCorrect = game.cleanCorrect + game.assistedCorrect;
-  const mastery = totalCorrect ? Math.round((game.cleanCorrect / Math.max(attempted, 1)) * 100) : 0;
-  const today = new Date().toISOString().slice(0, 10);
-  const todayCount = Number(game.daily[today] || 0);
-  const examDate = new Date(`${DATA.exam?.date || "2026-08-02"}T00:00:00`);
-  const days = Math.max(0, Math.ceil((examDate - new Date()) / 86400000));
-  const rank = level >= 20 ? "S" : level >= 15 ? "A" : level >= 10 ? "B" : level >= 6 ? "C" : level >= 3 ? "D" : "F";
-  const titles = ["法典新兵", "程序斥候", "招標騎士", "履約守衛", "採購賢者"];
-  const weak = SUBJECTS.map((subject) => {
-    const qs = QUESTIONS.filter((question) => question.subjectId === subject.id);
-    const attempts = qs.reduce((sum, question) => sum + statsFor(question.id).attempts, 0);
-    const errors = qs.reduce((sum, question) => sum + statsFor(question.id).wrong, 0);
-    return { title: subject.title, errors, attempts };
-  }).filter((item) => item.errors).sort((a, b) => (b.errors / Math.max(b.attempts, 1)) - (a.errors / Math.max(a.attempts, 1)))[0];
   $("#totalQuestions").textContent = QUESTIONS.length;
   $("#attemptedQuestions").textContent = attempted;
   $("#wrongQuestions").textContent = wrong;
   $("#placeholderCount").textContent = PLACEHOLDER_COUNT;
-  $("#heroLevel").textContent = `Lv. ${level} ${titles[Math.min(titles.length - 1, Math.floor((level - 1) / 4))]}`;
-  $("#rankBadge").textContent = `RANK ${rank}`;
-  $("#xpLabel").textContent = `${levelXp} / 100 XP`;
-  $("#xpBar").style.width = `${levelXp}%`;
-  $("#bestCombo").textContent = game.bestCombo;
-  $("#badgeCount").textContent = `${badgeCount} / ${SUBJECTS.length}`;
-  $("#masteryRate").textContent = `${Math.min(100, mastery)}%`;
-  $("#countdownDays").textContent = days;
-  $("#dailyBar").style.width = `${Math.min(100, (todayCount / 20) * 100)}%`;
-  $("#dailyLabel").textContent = `${Math.min(todayCount, 20)} / 20`;
-  $("#dailyMission").textContent = todayCount >= 20 ? "今日任務完成！" : "完成 20 題練習";
-  $("#weakSubject").textContent = weak ? weak.title : "尚未發現，先開始一回練習";
   $("#generatedAt").textContent = `題庫建立日期：${DATA.generatedAt || "未標示"}`;
   updatePoolInfo();
 }
 
-function renderChapterMap() {
-  const game = gameState();
-  $("#chapterMap").innerHTML = SUBJECTS.map((subject) => {
-    const rate = Number(game.chapterRates[subject.id] || 0);
-    const cleared = !!game.badges[subject.id];
-    const unlocked = rate >= 80;
-    return `
-      <article class="chapter-card ${cleared ? "is-clear" : unlocked ? "is-boss" : ""} ${game.lastSubject === subject.id ? "selected" : ""}" data-chapter="${subject.id}" tabindex="0" role="button" aria-label="選擇 ${escapeHTML(subject.title)}">
-        <span class="chapter-no">CH. ${subject.id}</span>
-        <h3>${escapeHTML(subject.title)}</h3>
-        <p>${escapeHTML(subject.group)}</p>
-        <div class="bar"><span style="width:${rate}%"></span></div>
-        <footer><span>${rate}%</span><span>${cleared ? "徽章已取得" : unlocked ? "Boss 已解鎖" : "修練中"}</span></footer>
-      </article>`;
-  }).join("");
-  $$("[data-chapter]").forEach((card) => {
-    const select = () => {
-      $("#subjectSelect").value = card.dataset.chapter;
-      updateGameState({ lastSubject: card.dataset.chapter });
-      updatePoolInfo();
-      renderChapterMap();
-    };
-    card.addEventListener("click", select);
-    card.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") { event.preventDefault(); select(); }
-    });
-  });
-}
-
 function renderSubjectProgress() {
-  const game = gameState();
   $("#subjectProgress").innerHTML = SUBJECTS.map((subject) => {
     const questions = QUESTIONS.filter((question) => question.subjectId === subject.id);
     const attempted = questions.filter((question) => statsFor(question.id).attempts > 0).length;
     const wrong = questions.filter(isWrongQuestion).length;
     const rate = questions.length ? Math.round((attempted / questions.length) * 100) : 0;
-    const clearRate = Number(game.chapterRates[subject.id] || 0);
-    const badge = !!game.badges[subject.id];
     return `
       <article class="subject-row">
         <div>
@@ -1158,7 +847,6 @@ function renderSubjectProgress() {
           <strong>${wrong}</strong>
           <span class="muted">錯題</span>
         </div>
-        <div class="status">${badge ? "◆ Boss 通關" : clearRate >= 80 ? "Boss 已解鎖" : `最佳 ${clearRate}%`}</div>
       </article>`;
   }).join("");
 }
@@ -1216,10 +904,6 @@ function renderWrongs() {
       const item = normalizeProgressItem(progress[button.dataset.master]);
       item.mastered = true;
       progress[button.dataset.master] = item;
-      const game = gameState();
-      const confused = { ...game.confused };
-      delete confused[button.dataset.master];
-      progress.__game = { ...game, confused };
       saveProgress();
       renderAll();
     });
@@ -1243,9 +927,6 @@ function setupSelectors() {
     ...GROUPS.map((group) => `<option value="group:${escapeHTML(group)}">${escapeHTML(group)}</option>`),
     ...SUBJECTS.map((subject) => `<option value="${subject.id}">${subject.id}. ${escapeHTML(subject.title)}</option>`),
   ].join("");
-  if (SUBJECTS.some((subject) => subject.id === gameState().lastSubject)) {
-    $("#subjectSelect").value = gameState().lastSubject;
-  }
 }
 
 function exportProgress() {
@@ -1275,7 +956,6 @@ function importProgress(file) {
 
 function renderAll(includeBank = true) {
   renderStats();
-  renderChapterMap();
   renderSubjectProgress();
   renderWrongs();
   if (includeBank) renderBank();
@@ -1285,21 +965,8 @@ function bindEvents() {
   ["subjectSelect", "typeSelect", "modeSelect", "countSelect"].forEach((id) => {
     $(`#${id}`).addEventListener("change", updatePoolInfo);
   });
-  $("#subjectSelect").addEventListener("change", () => {
-    const value = $("#subjectSelect").value;
-    if (SUBJECTS.some((subject) => subject.id === value)) {
-      updateGameState({ lastSubject: value });
-      renderChapterMap();
-    }
-  });
   $("#startBtn").addEventListener("click", () => startQuiz());
-  $("#bossBtn").addEventListener("click", () => startQuiz({ boss: true }));
   $("#wrongBtn").addEventListener("click", () => startQuiz({ mode: "wrong" }));
-  $("#continueBtn").addEventListener("click", () => {
-    $("#subjectSelect").value = gameState().lastSubject;
-    startQuiz();
-    $("#practice").scrollIntoView({ behavior: "smooth", block: "start" });
-  });
   $("#refreshWrongBtn").addEventListener("click", renderWrongs);
   $("#searchInput").addEventListener("input", renderBank);
   $("#loginBtn")?.addEventListener("click", loginWithGoogle);
