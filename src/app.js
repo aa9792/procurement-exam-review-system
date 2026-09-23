@@ -65,6 +65,7 @@ const SUBJECTS = (DATA.subjects || []).filter((subject) =>
   QUESTIONS.some((question) => question.subjectId === subject.id)
 );
 const GROUPS = [...new Set(SUBJECTS.map((subject) => subject.group))];
+const EXPLANATION_ENGINE = window.ProcurementExplanations?.createExplanationEngine(QUESTIONS);
 
 let progress = loadProgress();
 let session = [];
@@ -620,9 +621,20 @@ function lawBasisHTML(question) {
 }
 
 function explanationHTML(question) {
+  const explanation = question.type === "tf" ? EXPLANATION_ENGINE?.explain(question) : null;
+  const correctStatement =
+    question.type === "choice"
+      ? `本題正確答案為 ${answerLabel(question)}。`
+      : explanation?.correctedStatement ||
+        (question.answer === "O" ? questionText(question) : "題庫未提供可核對的完整正確敘述。");
+
   return `
     <div class="explanation-block">
-      <h4>詳解</h4>
+      <h4>答案詳解</h4>
+      <div class="correct-statement-block">
+        <strong>正確敘述</strong>
+        <p>${escapeHTML(correctStatement)}</p>
+      </div>
       ${lawBasisHTML(question)}
     </div>`;
 }

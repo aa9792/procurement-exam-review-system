@@ -455,6 +455,18 @@ select,
   line-height: 1.7;
 }
 
+.correct-statement-block {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  border-color: #9cc8ad;
+  background: #f1f9f4;
+}
+
+.correct-statement-block strong {
+  color: #24533a;
+}
+
 .law-basis {
   border: 1px solid #dbe5ff;
   border-radius: 8px;
