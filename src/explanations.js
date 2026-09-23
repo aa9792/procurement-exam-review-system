@@ -174,7 +174,7 @@
     const evidenceSupportsAnswer =
       answerEvidence && answerEvidence.question.answer === (intent.asksWrong ? "X" : "O");
     const baseReason = intent.asksWrong
-      ? `本題採反向問法，選項（${question.answer}）「${correctOption}」是不符合規定／不屬於題幹範圍的一項，因此要選它。`
+      ? `本題採反向問法，選項（${question.answer}）「${correctOption}」正是題目要求找出的例外、錯誤或不屬項，因此要選它。`
       : `本題要找符合規定者，選項（${question.answer}）「${correctOption}」最符合題幹設定的主體、條件與程序，因此是答案。`;
     const reason = evidenceSupportsAnswer
       ? `${baseReason}同科題庫另有相近敘述並判為${answerEvidence.question.answer === "O" ? "正確" : "錯誤"}，可交叉確認這個判斷。`

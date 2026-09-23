@@ -527,106 +527,330 @@ function subjectInfo(question) {
 function textForLawBasis(question) {
   const correctOption =
     question.type === "choice" ? question.options?.[Number(question.answer) - 1] || "" : questionText(question);
-  return `${questionText(question)} ${question.raw || ""} ${correctOption} ${question.subject}`;
+  return `${questionText(question)} ${correctOption}`;
 }
 
 function procurementActLink(article) {
-  return `https://law.moj.gov.tw/LawClass/LawSingle.aspx?pcode=A0030057&flno=${encodeURIComponent(article)}`;
+  const flno = String(article).replace("之", "-");
+  return `https://law.moj.gov.tw/LawClass/LawSingle.aspx?pcode=A0030057&flno=${encodeURIComponent(flno)}`;
+}
+
+const PROCUREMENT_ARTICLE_SUMMARIES = {
+  1: "建立公平、公開的政府採購制度，提升效率與功能並確保品質。",
+  2: "採購包含工程定作、財物買受／定製／承租，以及勞務委任或僱傭等。",
+  3: "政府機關、公立學校及公營事業辦理採購，原則上適用政府採購法。",
+  4: "受機關補助達採購金額半數且補助金額達公告金額者，適用採購法並受補助機關監督。",
+  5: "機關得委託法人或團體代辦採購，代辦採購仍適用採購法。",
+  6: "採購應維護公共利益及公平合理，不得無正當理由差別待遇；專業判斷仍不得違反採購法。",
+  7: "界定工程、財物、勞務採購；兼具二種以上性質時，依預算金額比率最高者認定。",
+  8: "界定採購法所稱廠商，包括得提供工程、財物或勞務的自然人、法人、機構或團體。",
+  9: "規定主管機關及上級機關的認定方式。",
+  11: "採購資訊中心及工程價格資料庫可供預算編列與底價訂定參考。",
+  "11之1": "巨額工程採購應依特性及需要成立採購工作及審查小組。",
+  12: "查核金額以上採購的開標、比價、議價、決標及驗收，應報請上級機關派員監辦。",
+  13: "公告金額以上採購，除特殊情形外，應由主（會）計及有關單位會同監辦。",
+  14: "不得意圖規避採購法而分批辦理；必要分批且經核准者，仍按總金額適用程序。",
+  15: "規範採購人員離職後接洽限制及本人、配偶、親屬利益衝突迴避。",
+  18: "招標方式分為公開招標、選擇性招標及限制性招標。",
+  19: "公告金額以上採購，除符合選擇性或限制性招標要件外，應公開招標。",
+  20: "列舉公告金額以上採購得採選擇性招標的情形。",
+  21: "選擇性招標得先辦資格審查並建立合格廠商名單，且應給予平等受邀機會。",
+  22: "列舉公告金額以上採購得採限制性招標的法定情形。",
+  23: "未達公告金額採購的招標方式，由中央或地方主管機關另定。",
+  24: "機關基於效率及品質要求得採統包，將設計與施工、供應或安裝等併案辦理。",
+  25: "共同投標須有助競爭或無不當限制競爭，並於投標時附共同投標協議書。",
+  26: "技術規格應依功能或效益訂定，不得造成限制競爭；指定廠牌原則上須允許同等品。",
+  27: "公開或選擇性招標應刊登政府採購公報並公開於資訊網路。",
+  28: "公告或邀標日起至截止投標日的等標期，應訂定合理期限。",
+  29: "公開招標文件應公開提供，且不得登記領標廠商名稱。",
+  30: "原則上應在招標文件規定押標金及保證金，並列有得免收的採購情形。",
+  31: "規定押標金發還、不予發還、追繳事由及追繳時效。",
+  33: "規範投標文件送達、電子傳輸及非契約必要之點文件的補正。",
+  34: "招標文件公告前、底價與投標廠商資料應依規定保密。",
+  36: "機關得依需要訂定基本資格；特殊或巨額採購得訂定特定資格。",
+  37: "廠商資格不得不當限制競爭，且應限於確認履約所必要的能力。",
+  45: "公開招標及選擇性招標原則上應依招標文件公告的時間及地點公開開標。",
+  46: "底價應依圖說、規範、契約並考量成本、市場行情及政府機關決標資料訂定。",
+  47: "訂定底價確有困難的特殊或複數決標採購，得不訂底價，但應載明理由及決標條件。",
+  48: "規範招標案件得開標、決標，以及第一次公開招標投標廠商家數等條件。",
+  49: "未達公告金額而逾公告金額十分之一者，原則上應公開取得三家以上書面報價或企劃書。",
+  50: "投標文件有偽造、借名、重大異常或不符招標文件等情形者，不予開標或決標。",
+  52: "規定最低標、最有利標、最高標及複數決標等決標原則。",
+  53: "合於招標文件的最低標超過底價時，得辦理減價並在法定條件下決標。",
+  54: "最低標有二家以上標價相同時，依比減價或抽籤等方式決定得標廠商。",
+  56: "採最有利標決標時，應依招標文件所定評審標準評選；協商須符合本條程序。",
+  58: "總標價或部分標價偏低而顯不合理時，機關得限期要求說明或擔保後再決標。",
+  61: "公告金額以上採購的決標結果，原則上應刊登政府採購公報。",
+  62: "機關辦理採購的決標資料，應依規定定期彙送主管機關。",
+  63: "採購契約原則上應採主管機關訂定的契約範本，契約應訂明權利義務。",
+  65: "得標廠商應自行履行工程或勞務的主要部分，不得轉包。",
+  66: "違法轉包時，得標廠商與轉包廠商對機關負連帶履行及賠償責任。",
+  67: "得標廠商得分包，但對分包部分仍負完全責任；特定分包廠商應依規定報備。",
+  70: "工程採購應訂定品質管理規定，辦理品質管理、環境保護及施工安全查核。",
+  "70之1": "工程規劃及設計應依規模與特性分析施工危險，編製安全衛生圖說、規範並量化編列費用。",
+  71: "採購完成履約後，機關應依期限辦理驗收，並得辦理部分驗收。",
+  72: "驗收結果與契約不符時，應通知限期改善、拆除、重作、退貨或換貨；符合條件者得減價收受。",
+  73: "驗收應作成紀錄；驗收合格後應填具結算驗收證明書。",
+  "73之1": "驗收付款原則上應於接到廠商請款單據後 15 日內辦理；涉及申請補助款者為 30 日，契約另有約定者從其約定。",
+  74: "廠商與機關間關於招標、審標、決標的爭議，得依異議及申訴程序處理。",
+  75: "廠商對招標文件、招標過程或結果認為違法致損權益者，得在法定期限內提出異議。",
+  76: "廠商對異議處理結果不服，或機關逾期不處理者，得在期限內提出申訴。",
+  "85之1": "履約爭議得向採購申訴審議委員會申請調解；工程及技術服務採購另有強化調解、仲裁機制。",
+  87: "處罰以強暴、詐術、合意或借牌等方式妨害投標、圍標的行為。",
+  94: "辦理評選應成立採購評選委員會，委員專業資格、人數與組成依規定辦理。",
+  "93之1": "機關得以電子化方式辦理招標、領標、投標、開標、決標及費用收取。",
+  101: "廠商有法定違法或重大違約情形時，機關應通知並依程序刊登政府採購公報。",
+  102: "廠商對第 101 條通知不服，得提出異議及申訴；機關應依期限處理。",
+  103: "刊登公報的廠商於法定期間內不得參加投標或作為決標、分包對象。",
+};
+
+const NAMED_LAW_REFERENCES = {
+  政府採購法施行細則: {
+    pcode: "A0030058",
+    url: "https://law.moj.gov.tw/LawClass/LawAll.aspx?pcode=A0030058",
+    summary: "補充採購金額計算、監辦、招標、審標、決標、履約及驗收等採購法執行細節。",
+  },
+  招標期限標準: { summary: "規定各類招標案件等標期的最低期限及得縮短期限的條件。" },
+  押標金保證金暨其他擔保作業辦法: { summary: "規定押標金、保證金及其他擔保的額度、繳納、發還與不發還方式。" },
+  最有利標評選辦法: { summary: "規定最有利標的評選項目、評審標準、評定方式、協商及決標程序。" },
+  採購評選委員會組織準則: { summary: "規定評選委員會的任務、委員人數、專家學者比例及組成方式。" },
+  採購評選委員會審議規則: { summary: "規定評選委員會會議、評分、出席、迴避及審議程序。" },
+  採購契約要項: { summary: "整理採購契約應載明的履約、價金、變更、驗收、違約及爭議處理事項。" },
+  電子採購作業辦法: { summary: "規定電子領標、投標、報價、開標及電子文件的作業程序。" },
+  機關委託技術服務廠商評選及計費辦法: { summary: "規定技術服務廠商的評選、服務費用計算及相關作業。" },
+  機關主會計及有關單位會同監辦採購辦法: { summary: "規定主（會）計及有關單位會同監辦的範圍、方式、得不派員監辦情形及紀錄程序。" },
+};
+
+function lawSearchLink(name) {
+  return `https://law.moj.gov.tw/LawClass/LawSearch.aspx?ty=ONEBAR&kw=${encodeURIComponent(name)}`;
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function regulationArticleLink(pcode, article) {
+  const flno = String(article).replace("之", "-");
+  return `https://law.moj.gov.tw/LawClass/LawSingle.aspx?pcode=${encodeURIComponent(pcode)}&flno=${encodeURIComponent(flno)}`;
+}
+
+function namedRegulationReference(name, article, summary, confidence = "題目明示") {
+  const info = NAMED_LAW_REFERENCES[name] || {};
+  return {
+    key: `${name}-${article || "all"}`,
+    label: `${name}${article ? `第 ${article} 條` : ""}`,
+    url: info.pcode && article ? regulationArticleLink(info.pcode, article) : info.url || lawSearchLink(name),
+    summary: summary || info.summary,
+    confidence,
+  };
+}
+
+function procurementArticleReference(article, confidence = "題目明示") {
+  const normalized = String(article).replace("-", "之");
+  return {
+    key: `政府採購法-${normalized}`,
+    label: `政府採購法第 ${normalized} 條`,
+    url: procurementActLink(normalized),
+    summary: PROCUREMENT_ARTICLE_SUMMARIES[normalized] || "請開啟全國法規資料庫核對本條完整條文及各項、各款規定。",
+    confidence,
+  };
 }
 
 function extractExplicitLawReferences(question) {
   const text = textForLawBasis(question);
   const refs = [];
-  const rangeRegex = /(政府採購法|採購法)第\s*(\d+(?:之\d+)?)\s*條\s*(?:至|到|-)\s*第?\s*(\d+(?:之\d+)?)\s*條/g;
-  const articleRegex = /(政府採購法|採購法)第\s*(\d+(?:之\d+)?)\s*條/g;
-  let match;
-  while ((match = rangeRegex.exec(text))) {
-    refs.push({
-      label: `政府採購法第 ${match[2]} 條至第 ${match[3]} 條`,
-      url: procurementActLink(match[2]),
-    });
+  const add = (article) => {
+    const ref = procurementArticleReference(article);
+    if (!refs.some((item) => item.key === ref.key)) refs.push(ref);
+  };
+  for (const match of text.matchAll(/(?:政府採購法|採購法)第\s*(\d+)(?:\s*(?:條\s*之|之|-)\s*(\d+))?\s*條?/g)) {
+    add(match[2] ? `${match[1]}之${match[2]}` : match[1]);
   }
-  while ((match = articleRegex.exec(text))) {
-    const label = `政府採購法第 ${match[2]} 條`;
-    if (!refs.some((ref) => ref.label === label)) refs.push({ label, url: procurementActLink(match[2]) });
+
+  const containsOtherNamedRule = Object.keys(NAMED_LAW_REFERENCES).some(
+    (name) => name !== "政府採購法施行細則" && text.includes(name)
+  );
+  if (["02", "03", "04"].includes(question.subjectId) && /(?:政府)?採購法/.test(text) && !containsOtherNamedRule) {
+    for (const match of text.matchAll(/第\s*(\d+)(?:\s*(?:條\s*之|之|-)\s*(\d+))?\s*條?/g)) {
+      const prefix = text.slice(Math.max(0, match.index - 20), match.index);
+      if (/民法|刑法|行政程序法|規費法|公司法|施行細則|組織準則|審議規則/.test(prefix)) continue;
+      add(match[2] ? `${match[1]}之${match[2]}` : match[1]);
+    }
   }
-  [
-    "政府採購法施行細則",
-    "招標期限標準",
-    "押標金保證金暨其他擔保作業辦法",
-    "最有利標評選辦法",
-    "採購評選委員會組織準則",
-    "採購評選委員會審議規則",
-    "採購契約要項",
-    "電子採購作業辦法",
-    "機關委託技術服務廠商評選及計費辦法",
-  ].forEach((name) => {
-    if (text.includes(name) && !refs.some((ref) => ref.label === name)) refs.push({ label: name });
-  });
-  return refs.slice(0, 4);
+  return refs.slice(0, 3);
 }
 
-function inferLawBasis(question) {
+function extractNamedLawReferences(question) {
+  const text = textForLawBasis(question);
+  return Object.entries(NAMED_LAW_REFERENCES)
+    .filter(([name]) => text.includes(name))
+    .map(([name]) => {
+      const article = text.match(new RegExp(`${escapeRegExp(name)}」?第\\s*(\\d+(?:[之-]\\d+)?)\\s*條`))?.[1];
+      return namedRegulationReference(name, article);
+    })
+    .slice(0, 2);
+}
+
+function specialLawReferences(question) {
+  const text = textForLawBasis(question);
+  if (/採購金額.*(?:計算|認定)|租期不確定/.test(text)) {
+    return [
+      namedRegulationReference(
+        "政府採購法施行細則",
+        "6",
+        "採購金額應於招標前認定；分批採購按全部批數預算總額計算，租期不確定者按每月租金 48 倍計算（即 4 年）。",
+        "現行法規對應"
+      ),
+    ];
+  }
+  if (/查核金額以上.*(?:等標期|截止收件日).*5日/.test(text)) {
+    return [
+      namedRegulationReference(
+        "政府採購法施行細則",
+        "7",
+        "查核金額以上採購的招標，應於等標期或截止收件日 5 日前檢送預算、招標文件及相關文件，報請上級機關派員監辦。",
+        "現行法規對應"
+      ),
+    ];
+  }
+  if (/書面審核監辦/.test(text)) {
+    return [
+      namedRegulationReference(
+        "政府採購法施行細則",
+        "11",
+        "監辦是實地監視或書面審核採購程序是否合法；採書面審核監辦時，應經機關首長或其授權人員核准。",
+        "現行法規對應"
+      ),
+    ];
+  }
+  return [];
+}
+
+function inferLawReferences(question) {
   const text = textForLawBasis(question);
   const rules = [
-    { match: /異議|招標文件異議|採購申訴/, basis: "政府採購法第 74 條至第 86 條之 1：招標、審標、決標爭議的異議與申訴制度。" },
-    { match: /申訴|審議判斷|採購申訴審議/, basis: "政府採購法第 75 條至第 86 條之 1及採購申訴審議相關規定：申訴期間、審議程序與判斷效力。" },
-    { match: /調解|仲裁|履約爭議/, basis: "政府採購法第 85 條之 1至第 85 條之 4：履約爭議的調解、仲裁與後續處理。" },
-    { match: /停權|刊登|政府採購公報|拒絕往來|第101|第 101/, basis: "政府採購法第 101 條至第 103 條：通知廠商、刊登政府採購公報及停權期間效果。" },
-    { match: /罰則|圍標|借牌|綁標|刑責|第87|第 87/, basis: "政府採購法第 87 條至第 92 條：圍標、借牌、強迫、詐術等違法行為及罰則。" },
-    { match: /押標金|保證金|不予發還|追繳/, basis: "政府採購法第 30 條、第 31 條及押標金保證金暨其他擔保作業辦法：押標金、保證金與追繳/不發還事由。" },
-    { match: /底價|標價偏低|比減價|減價|超底價/, basis: "政府採購法第 46 條至第 58 條及施行細則決標規定：底價訂定、價格分析、減價與決標程序。" },
-    { match: /最有利標|評選|優勝廠商|協商|序位法/, basis: "政府採購法第 52 條、第 56 條、最有利標評選辦法及採購評選委員會相關規定：評選、協商與決標依據。" },
-    { match: /招標|公告|等標|公開招標|選擇性招標|限制性招標|廠商資格/, basis: "政府採購法第 18 條至第 38 條、施行細則及招標期限標準：招標方式、公告、等標期與投標資格。" },
-    { match: /決標|開標|審標|廢標|保留決標/, basis: "政府採購法第 45 條至第 62 條及施行細則決標規定：開標、審標、決標與廢標處理。" },
-    { match: /履約|驗收|保固|查驗|初驗|複驗/, basis: "政府採購法第 63 條至第 73 條及施行細則履約驗收規定：契約履行、驗收、保固與付款。" },
-    { match: /轉包|分包|連帶責任/, basis: "政府採購法第 65 條至第 67 條：轉包禁止、分包管理與得標廠商責任。" },
-    { match: /契約|契約變更|違約金|物價調整|契約價金/, basis: "政府採購法第 63 條、第 64 條、採購契約要項及工程採購契約範本：契約文件、變更、價金與違約責任。" },
-    { match: /電子|電子領標|電子投標|電子採購網|電子報價/, basis: "電子採購作業辦法及政府電子採購網作業規定：電子領標、投標、報價與系統紀錄效力。" },
-    { match: /技術服務|服務費用|建築師|監造|設計服務/, basis: "機關委託技術服務廠商評選及計費辦法：技術服務廠商評選、計費與履約管理。" },
-    { match: /統包|設計施工|功能需求/, basis: "統包實施辦法、政府採購法及工程採購契約相關規定：統包需求、評選與履約責任。" },
+    { match: /採購法.*適用範圍|採購法所稱採購|應依採購法辦理/, articles: ["2", "3"] },
+    { match: /權利採購|工程、?財物及勞務|工程.*財物.*勞務/, articles: ["7"] },
+    { match: /公共利益|公平合理|差別待遇|違反採購法之決定/, articles: ["6"] },
+    { match: /上級機關/, articles: ["9"] },
+    { match: /監辦|派員監辦|會同監辦/, articles: ["12", "13"] },
+    { match: /招標文件.*異議|異議/, articles: ["75"] },
+    { match: /申訴|審議判斷/, articles: ["76"] },
+    { match: /調解|仲裁|履約爭議/, articles: ["85之1"] },
+    { match: /停權|刊登.*公報|拒絕往來/, articles: ["101", "103"] },
+    { match: /圍標|借牌|綁標|妨害投標/, articles: ["87"] },
+    { match: /押標金|追繳/, articles: ["30", "31"] },
+    { match: /標價偏低/, articles: ["58"] },
+    { match: /底價|超底價/, articles: ["46", "47"] },
+    { match: /最有利標/, articles: ["56"] },
+    { match: /評選委員會/, articles: ["94"] },
+    { match: /技術規格|同等品|限制競爭/, articles: ["26", "37"] },
+    { match: /限制性招標/, articles: ["22"] },
+    { match: /選擇性招標/, articles: ["20", "21"] },
+    { match: /公開招標/, articles: ["19"] },
+    { match: /招標方式/, articles: ["18"] },
+    { match: /等標期/, articles: ["28"] },
+    { match: /廠商資格/, articles: ["36", "37"] },
+    { match: /不予開標|不予決標|偽造|借名/, articles: ["50"] },
+    { match: /決標原則|最低標|複數決標/, articles: ["52"] },
+    { match: /公開開標|第一次公開招標|廢標/, articles: ["45", "48"] },
+    { match: /初驗|複驗|減價收受|驗收結果.*契約不符/, articles: ["71", "72"] },
+    { match: /轉包/, articles: ["65", "66"] },
+    { match: /分包/, articles: ["67"] },
+    { match: /採購契約範本|契約範本/, articles: ["63"] },
+    { match: /電子領標|電子投標|電子採購|電子報價/, articles: ["93之1"] },
+    { match: /統包/, articles: ["24"] },
   ];
-  return rules.filter((rule) => rule.match.test(text)).map((rule) => rule.basis).slice(0, 3);
+  const articles = [];
+  rules.forEach((rule) => {
+    if (!rule.match.test(text)) return;
+    rule.articles.forEach((article) => {
+      if (!articles.includes(article)) articles.push(article);
+    });
+  });
+  return articles.slice(0, 2).map((article) => procurementArticleReference(article, "關鍵字對應"));
 }
 
-function defaultSubjectLawBasis(question) {
-  const subject = subjectInfo(question);
-  const focus = subject.articleFocus || `${question.subject}相關採購法規、子法及作業規範。`;
-  const source = sourceFileName(question.source);
-  return [
-    `本科法規主軸：${focus}`,
-    `題庫依據：${source} 原題第 ${question.number} 題的標準答案。`,
-  ];
-}
-
-function lawBasisHTML(question) {
+function lawReferences(question) {
   const explicitRefs = extractExplicitLawReferences(question);
-  const inferred = inferLawBasis(question);
-  const defaultBasis = defaultSubjectLawBasis(question);
-  const items = [
-    ...explicitRefs.map((ref) =>
-      ref.url
-        ? `<a class="law-link" href="${escapeHTML(ref.url)}" target="_blank" rel="noopener">${escapeHTML(ref.label)}</a>`
-        : escapeHTML(ref.label)
-    ),
-    ...inferred.map(escapeHTML),
-    ...defaultBasis.map(escapeHTML),
-  ];
-  const unique = [...new Set(items)].slice(0, 6);
+  const namedRefs = extractNamedLawReferences(question);
+  const specialRefs = specialLawReferences(question);
+  const inferredRefs = explicitRefs.length || namedRefs.length || specialRefs.length ? [] : inferLawReferences(question);
+  const refs = [...specialRefs, ...explicitRefs, ...namedRefs, ...inferredRefs]
+    .filter((ref, index, items) => items.findIndex((item) => item.key === ref.key) === index)
+    .slice(0, 4);
+  if (!refs.length) {
+    refs.push({
+      key: "no-exact-reference",
+      label: "本題題庫未標示具體法條",
+      summary: "此題可能依行政規則、作業要點、函釋或契約範本出題；目前無法僅憑題幹可靠對應到單一法條。",
+      confidence: "待補法源",
+    });
+  }
+  return refs;
+}
+
+function lawApplication(question, explanation, ref) {
+  if (ref.key === "no-exact-reference") {
+    return "目前只能依題庫標準答案與相近正確題核對，不能把未確認的條號當成法源。";
+  }
+  if (question.type === "choice") {
+    const option = question.options?.[Number(question.answer) - 1] || "";
+    if (explanation?.intent?.asksWrong) {
+      return `本題採排除式問法；對照上述規定可知，答案選項「${option}」正是題目要求找出的例外、錯誤或不屬項，因此應選此項。`;
+    }
+    return `答案選項「${option}」符合上述規定所要求的主體、條件或程序，因此應選此項。`;
+  }
+  if (question.answer === "X" && explanation?.wrongPart && explanation?.correctPart) {
+    return `原題錯在「${explanation.wrongPart}」，正確應為「${explanation.correctPart}」；對照上述規定可確認這項差異，因此判為 X。`;
+  }
+  if (question.answer === "X") {
+    return "原題至少有一項主體、條件、程序或法律效果與上述規定不符，因此判為 X。";
+  }
+  return "題幹所述的主體、條件、程序及法律效果與上述規定一致，因此判為 O。";
+}
+
+function lawBasisHTML(question, explanation) {
+  const refs = lawReferences(question);
   return `
     <div class="law-basis">
-      <strong>法規依據：</strong>
-      <ul>${unique.map((item) => `<li>${item}</li>`).join("")}</ul>
+      <strong>法規依據</strong>
+      <div class="law-reference-list">
+        ${refs
+          .map(
+            (ref) => `
+              <div class="law-reference-item">
+                <div class="law-reference-heading">
+                  ${
+                    ref.url
+                      ? `<a class="law-link" href="${escapeHTML(ref.url)}" target="_blank" rel="noopener">${escapeHTML(ref.label)}</a>`
+                      : `<span class="law-reference-title">${escapeHTML(ref.label)}</span>`
+                  }
+                  <span class="law-confidence">${escapeHTML(ref.confidence)}</span>
+                </div>
+                <p>${escapeHTML(ref.summary)}</p>
+                <p class="law-application"><strong>與本題的關係：</strong>${escapeHTML(
+                  lawApplication(question, explanation, ref)
+                )}</p>
+              </div>`
+          )
+          .join("")}
+      </div>
     </div>`;
 }
 
 function explanationHTML(question) {
-  const explanation = question.type === "tf" ? EXPLANATION_ENGINE?.explain(question) : null;
+  const explanation = EXPLANATION_ENGINE?.explain(question);
   const correctStatement =
     question.type === "choice"
-      ? `本題正確答案為 ${answerLabel(question)}。`
+      ? `本題正確答案為 ${answerLabel(question)}${/[。！？!?]$/.test(answerLabel(question)) ? "" : "。"}`
       : explanation?.correctedStatement ||
         (question.answer === "O" ? questionText(question) : "題庫未提供可核對的完整正確敘述。");
+  const reason =
+    explanation?.reason ||
+    (question.type === "choice"
+      ? "請對照答案選項與下方條文的主體、條件、程序及法律效果。"
+      : "請對照下方法規依據核對題幹敘述。");
 
   return `
     <div class="explanation-block">
@@ -634,8 +858,9 @@ function explanationHTML(question) {
       <div class="correct-statement-block">
         <strong>正確敘述</strong>
         <p>${escapeHTML(correctStatement)}</p>
+        <p class="answer-reason"><strong>判斷理由：</strong>${escapeHTML(reason)}</p>
       </div>
-      ${lawBasisHTML(question)}
+      ${lawBasisHTML(question, explanation)}
     </div>`;
 }
 
