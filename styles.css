@@ -269,6 +269,53 @@ h3 {
   margin-bottom: 14px;
 }
 
+.study-focus {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) auto minmax(260px, 1fr);
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 14px;
+  border-block: 1px solid var(--line);
+  background: #fff;
+  padding: 14px 4px;
+}
+
+.study-focus strong,
+.study-focus p {
+  margin: 0;
+}
+
+.study-focus strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 18px;
+}
+
+.focus-kicker {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.focus-scores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.focus-scores span {
+  border: 1px solid var(--line);
+  background: var(--soft);
+  padding: 5px 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.focus-scores .is-weak {
+  border-color: #e5b2b8;
+  background: #fff0f2;
+  color: var(--danger);
+}
+
 .stat-card,
 .panel {
   background: var(--panel);
@@ -374,6 +421,51 @@ select,
   overflow-wrap: anywhere;
 }
 
+.focus-guide {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid #cdd7e6;
+  background: #f7f9fc;
+}
+
+.focus-guide span {
+  min-width: 0;
+  padding: 9px 10px;
+  overflow-wrap: anywhere;
+}
+
+.focus-guide span + span {
+  border-left: 1px solid #cdd7e6;
+}
+
+.focus-guide b {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.focus-mark {
+  border-radius: 2px;
+  padding: 0 2px;
+  font-weight: 900;
+}
+
+.focus-mark.is-negative {
+  background: #ffe0e4;
+  color: #8b1d2d;
+}
+
+.focus-mark.is-number {
+  background: #fff1b8;
+  color: #624700;
+}
+
+.focus-mark.is-modal {
+  background: #dce8ff;
+  color: #24467e;
+}
+
 .options {
   display: grid;
   gap: 10px;
@@ -470,6 +562,46 @@ select,
 .answer-reason {
   padding-top: 8px;
   border-top: 1px solid #cfe1d5;
+}
+
+.memory-rule {
+  margin-top: 8px;
+  border-left: 4px solid var(--ok);
+  background: #fff;
+  padding: 8px 10px;
+  font-weight: 800;
+}
+
+.wrong-reasons {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.wrong-reasons > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.reason-chip {
+  min-height: 34px;
+  padding: 5px 9px;
+  font-size: 14px;
+}
+
+.reason-chip.is-selected {
+  border-color: var(--accent);
+  background: #eaf0ff;
+  color: var(--accent-dark);
+  font-weight: 800;
+}
+
+.wrong-cause {
+  border-left: 3px solid var(--danger);
+  background: #fff5f6;
+  padding: 8px 10px;
 }
 
 .law-basis {
@@ -717,7 +849,8 @@ footer {
 
   .stats-grid,
   .layout,
-  .subject-row {
+  .subject-row,
+  .study-focus {
     grid-template-columns: 1fr;
   }
 
@@ -738,6 +871,15 @@ footer {
 
   .question-stem {
     font-size: 22px;
+  }
+
+  .focus-guide {
+    grid-template-columns: 1fr;
+  }
+
+  .focus-guide span + span {
+    border-left: 0;
+    border-top: 1px solid #cdd7e6;
   }
 }
 

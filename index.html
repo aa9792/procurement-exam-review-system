@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>採購證照複習系統</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=1151002" />
   </head>
   <body>
     <header class="app-header">
@@ -76,22 +76,35 @@
         </a>
       </nav>
 
+      <section class="study-focus" aria-label="本次複習策略">
+        <div>
+          <span class="focus-kicker">第一次成績 228 / 330</span>
+          <strong>只差 3 分及格，這次把目標放在穩定拿到 80%</strong>
+        </div>
+        <div class="focus-scores" aria-label="各課程得分率">
+          <span>法規 71.3%</span>
+          <span>實務 70.0%</span>
+          <span class="is-weak">其他 65.3%</span>
+        </div>
+        <p>每天先做 20 題：錯題與到期題優先，其他課程加強；同一題需隔日答對 2 次才算熟練。</p>
+      </section>
+
       <section class="stats-grid" aria-label="題庫統計">
         <article class="stat-card">
-          <span>真題總數</span>
+          <span>最新真題</span>
           <strong id="totalQuestions">0</strong>
         </article>
         <article class="stat-card">
-          <span>已練題數</span>
+          <span>今日待複習</span>
           <strong id="attemptedQuestions">0</strong>
         </article>
         <article class="stat-card">
-          <span>目前錯題</span>
+          <span>尚未穩定</span>
           <strong id="wrongQuestions">0</strong>
         </article>
         <article class="stat-card">
-          <span>假題檢查</span>
-          <strong id="placeholderCount">0</strong>
+          <span>已熟練</span>
+          <strong id="masteredQuestions">0</strong>
         </article>
       </section>
 
@@ -113,29 +126,21 @@
           <label>
             模式
             <select id="modeSelect">
-              <option value="unseen">未練題優先</option>
-              <option value="random">隨機練習</option>
+              <option value="review" selected>今日複習</option>
+              <option value="unseen">新題一刷</option>
               <option value="wrong">錯題複習</option>
+              <option value="random">隨機模擬</option>
             </select>
           </label>
-          <label>
-            題數
-            <select id="countSelect">
-              <option value="10">10 題</option>
-              <option value="20" selected>20 題</option>
-              <option value="30">30 題</option>
-              <option value="50">50 題</option>
-            </select>
-          </label>
-          <button id="startBtn" class="primary full" type="button">開始複習</button>
+          <button id="startBtn" class="primary full" type="button">開始 20 題複習</button>
           <button id="wrongBtn" class="full" type="button">直接練錯題</button>
           <p id="poolInfo" class="muted"></p>
         </aside>
 
         <section class="panel quiz-panel">
           <div id="quizIntro" class="empty-state">
-            <h2>選科目後開始練習</h2>
-            <p>此頁只會使用本資料夾 `data/questions.js` 內的 3599 題真題，不再產生或顯示模擬占位題。</p>
+            <h2>今天只專心做一回 20 題</h2>
+            <p>每題先找主詞、反向詞與數字；答完只記一條規則，明天再驗收一次。</p>
           </div>
           <div id="quizArea" class="hidden"></div>
         </section>
@@ -144,7 +149,7 @@
       <section id="progress" class="panel progress-panel">
         <div class="section-title">
           <h2>科目進度</h2>
-          <p class="muted">依已作答題數統計，錯題做對後可在下方標記熟練。</p>
+          <p class="muted">進度改以「隔日答對 2 次」計算，不再把看過一次當成熟練。</p>
         </div>
         <div id="subjectProgress" class="subject-list"></div>
       </section>
@@ -153,7 +158,7 @@
         <div class="section-title split">
           <div>
             <h2>錯題複習</h2>
-            <p class="muted">答錯且尚未標記熟練的題目會出現在這裡。</p>
+            <p class="muted">保留錯因與下次複習日，答對一次不會立刻從錯題本消失。</p>
           </div>
           <button id="refreshWrongBtn" type="button">更新錯題</button>
         </div>
@@ -177,12 +182,12 @@
       <span>未登入時進度儲存在本機瀏覽器；Google 或 Email 登入後會同步練習紀錄。</span>
     </footer>
 
-    <script src="./data/questions.js"></script>
-    <script src="./data/chapter-charts.js"></script>
-    <script src="./src/explanations.js"></script>
+    <script src="./data/questions.js?v=1151002"></script>
+    <script src="./data/chapter-charts.js?v=1151002"></script>
+    <script src="./src/explanations.js?v=1151002"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
-    <script src="./src/app.js"></script>
+    <script src="./src/app.js?v=1151002"></script>
   </body>
 </html>

@@ -1,0 +1,287 @@
+{
+  "previousBankVersion": "2026-06-14",
+  "bankVersion": "115-10-02",
+  "questionCountBefore": 3599,
+  "questionCountAfter": 3599,
+  "moved": [
+    {
+      "from": "08-tf-0079",
+      "to": "08-tf-0078"
+    },
+    {
+      "from": "08-tf-0080",
+      "to": "08-tf-0079"
+    },
+    {
+      "from": "08-tf-0081",
+      "to": "08-tf-0080"
+    },
+    {
+      "from": "08-tf-0082",
+      "to": "08-tf-0081"
+    },
+    {
+      "from": "08-tf-0083",
+      "to": "08-tf-0082"
+    },
+    {
+      "from": "08-tf-0084",
+      "to": "08-tf-0083"
+    },
+    {
+      "from": "08-tf-0085",
+      "to": "08-tf-0084"
+    },
+    {
+      "from": "08-tf-0086",
+      "to": "08-tf-0085"
+    },
+    {
+      "from": "08-tf-0087",
+      "to": "08-tf-0086"
+    },
+    {
+      "from": "08-tf-0088",
+      "to": "08-tf-0087"
+    },
+    {
+      "from": "08-tf-0089",
+      "to": "08-tf-0088"
+    },
+    {
+      "from": "08-tf-0090",
+      "to": "08-tf-0089"
+    },
+    {
+      "from": "08-tf-0091",
+      "to": "08-tf-0090"
+    },
+    {
+      "from": "08-tf-0092",
+      "to": "08-tf-0091"
+    },
+    {
+      "from": "08-tf-0093",
+      "to": "08-tf-0092"
+    },
+    {
+      "from": "08-tf-0094",
+      "to": "08-tf-0093"
+    },
+    {
+      "from": "08-tf-0095",
+      "to": "08-tf-0094"
+    },
+    {
+      "from": "08-tf-0096",
+      "to": "08-tf-0095"
+    },
+    {
+      "from": "08-tf-0097",
+      "to": "08-tf-0096"
+    },
+    {
+      "from": "08-tf-0098",
+      "to": "08-tf-0097"
+    },
+    {
+      "from": "08-tf-0099",
+      "to": "08-tf-0098"
+    },
+    {
+      "from": "08-tf-0100",
+      "to": "08-tf-0099"
+    },
+    {
+      "from": "08-tf-0101",
+      "to": "08-tf-0100"
+    },
+    {
+      "from": "08-tf-0102",
+      "to": "08-tf-0101"
+    },
+    {
+      "from": "08-tf-0103",
+      "to": "08-tf-0102"
+    },
+    {
+      "from": "08-tf-0104",
+      "to": "08-tf-0103"
+    },
+    {
+      "from": "08-tf-0105",
+      "to": "08-tf-0104"
+    },
+    {
+      "from": "08-tf-0106",
+      "to": "08-tf-0105"
+    },
+    {
+      "from": "08-tf-0107",
+      "to": "08-tf-0106"
+    },
+    {
+      "from": "08-tf-0108",
+      "to": "08-tf-0107"
+    },
+    {
+      "from": "08-tf-0109",
+      "to": "08-tf-0108"
+    },
+    {
+      "from": "08-tf-0110",
+      "to": "08-tf-0109"
+    },
+    {
+      "from": "08-tf-0111",
+      "to": "08-tf-0110"
+    },
+    {
+      "from": "08-tf-0112",
+      "to": "08-tf-0111"
+    },
+    {
+      "from": "08-tf-0113",
+      "to": "08-tf-0112"
+    },
+    {
+      "from": "08-tf-0114",
+      "to": "08-tf-0113"
+    },
+    {
+      "from": "08-tf-0115",
+      "to": "08-tf-0114"
+    }
+  ],
+  "semanticUpdates": [
+    {
+      "from": "02-tf-0735",
+      "to": "02-tf-0735",
+      "oldAnswer": "X",
+      "newAnswer": "X",
+      "similarity": 0.982
+    },
+    {
+      "from": "02-tf-0736",
+      "to": "02-tf-0736",
+      "oldAnswer": "X",
+      "newAnswer": "X",
+      "similarity": 0.976
+    },
+    {
+      "from": "02-tf-0737",
+      "to": "02-tf-0737",
+      "oldAnswer": "O",
+      "newAnswer": "O",
+      "similarity": 0.976
+    },
+    {
+      "from": "02-tf-0738",
+      "to": "02-tf-0738",
+      "oldAnswer": "X",
+      "newAnswer": "X",
+      "similarity": 0.978
+    },
+    {
+      "from": "02-tf-0739",
+      "to": "02-tf-0739",
+      "oldAnswer": "O",
+      "newAnswer": "O",
+      "similarity": 0.978
+    },
+    {
+      "from": "02-tf-0742",
+      "to": "02-tf-0742",
+      "oldAnswer": "X",
+      "newAnswer": "X",
+      "similarity": 0.974
+    },
+    {
+      "from": "04-tf-0142",
+      "to": "04-tf-0142",
+      "oldAnswer": "X",
+      "newAnswer": "X",
+      "similarity": 0.923
+    },
+    {
+      "from": "04-tf-0189",
+      "to": "04-tf-0189",
+      "oldAnswer": "O",
+      "newAnswer": "O",
+      "similarity": 0.917
+    },
+    {
+      "from": "04-tf-0195",
+      "to": "04-tf-0195",
+      "oldAnswer": "O",
+      "newAnswer": "O",
+      "similarity": 0.923
+    },
+    {
+      "from": "06-choice-0033",
+      "to": "06-choice-0033",
+      "oldAnswer": "2",
+      "newAnswer": "2",
+      "similarity": 0.833
+    },
+    {
+      "from": "07-choice-0069",
+      "to": "07-choice-0069",
+      "oldAnswer": "3",
+      "newAnswer": "3",
+      "similarity": 0.981
+    },
+    {
+      "from": "08-choice-0011",
+      "to": "08-choice-0011",
+      "oldAnswer": "4",
+      "newAnswer": "4",
+      "similarity": 0.979
+    },
+    {
+      "from": "08-tf-0029",
+      "to": "08-tf-0029",
+      "oldAnswer": "X",
+      "newAnswer": "X",
+      "similarity": 0.96
+    },
+    {
+      "from": "08-tf-0030",
+      "to": "08-tf-0030",
+      "oldAnswer": "O",
+      "newAnswer": "O",
+      "similarity": 0.956
+    },
+    {
+      "from": "08-tf-0078",
+      "to": "08-tf-0115",
+      "oldAnswer": "X",
+      "newAnswer": "O",
+      "similarity": 0.784
+    },
+    {
+      "from": "08-tf-0174",
+      "to": "08-tf-0174",
+      "oldAnswer": "O",
+      "newAnswer": "O",
+      "similarity": 0.985
+    },
+    {
+      "from": "14-choice-0026",
+      "to": "14-choice-0026",
+      "oldAnswer": "1",
+      "newAnswer": "1",
+      "similarity": 0.991
+    }
+  ],
+  "answerChanges": [
+    {
+      "from": "08-tf-0078",
+      "to": "08-tf-0115",
+      "oldAnswer": "X",
+      "newAnswer": "O"
+    }
+  ],
+  "added": [],
+  "removed": []
+}
