@@ -140,12 +140,9 @@ function migrateProgressToCurrentBank(source = {}) {
     const raw = snapshot[sourceId] || snapshot[question.id];
     if (!raw) return;
     const item = normalizeProgressItem(raw);
-    const alreadyCurrent = item.bankVersion === BANK_VERSION && item.fingerprint === question.fingerprint;
-    if (!alreadyCurrent && question.contentUpdated) {
-      item.mastered = false;
-      item.streak = 0;
-      item.dueAt = new Date().toISOString();
-    }
+    item.mastered = item.attempts > 0 && item.lastAnswer === question.answer;
+    item.streak = item.mastered ? 1 : 0;
+    item.dueAt = "";
     item.fingerprint = question.fingerprint || "";
     item.bankVersion = BANK_VERSION;
     migrated[question.id] = item;
@@ -178,8 +175,8 @@ function mergeProgress(localProgress = {}, cloudProgress = {}) {
       attempts: Math.max(localItem.attempts, cloudItem.attempts, correct + wrong),
       correct,
       wrong,
-      mastered: localItem.mastered || cloudItem.mastered,
-      streak: Math.max(localItem.streak, cloudItem.streak),
+      mastered: newer.mastered,
+      streak: newer.streak,
       lastAnswer: newer.lastAnswer || localItem.lastAnswer || cloudItem.lastAnswer || "",
       lastAt: newer.lastAt || localItem.lastAt || cloudItem.lastAt || "",
       lastCorrectDate: newer.lastCorrectDate || localItem.lastCorrectDate || cloudItem.lastCorrectDate || "",
@@ -1044,19 +1041,6 @@ function localDateKey(value = new Date()) {
   return new Date(date.getTime() - offset).toISOString().slice(0, 10);
 }
 
-function dueDate(days) {
-  const value = new Date();
-  value.setDate(value.getDate() + days);
-  return value.toISOString();
-}
-
-function isDueQuestion(question) {
-  const item = statsFor(question.id);
-  if (!item.attempts) return false;
-  if (!item.dueAt) return isWrongQuestion(question);
-  return !item.mastered && new Date(item.dueAt).getTime() <= Date.now();
-}
-
 function subjectMatches(question, selection) {
   if (selection === "all") return true;
   if (selection.startsWith("group:")) return question.group === selection.slice(6);
@@ -1086,16 +1070,15 @@ function updatePoolInfo() {
   const pool = filteredQuestions();
   const wrong = pool.filter(isWrongQuestion).length;
   const unseen = pool.filter((question) => !statsFor(question.id).attempts).length;
-  const due = pool.filter(isDueQuestion).length;
-  $("#poolInfo").textContent = `題庫 ${pool.length} 題｜今日到期 ${due}｜未練 ${unseen}｜錯題 ${wrong}`;
+  const attempted = pool.length - unseen;
+  $("#poolInfo").textContent = `題庫 ${pool.length} 題｜已作答 ${attempted}｜未作答 ${unseen}｜錯題 ${wrong}`;
 }
 
 function reviewPriority(question) {
   const item = statsFor(question.id);
-  if (isDueQuestion(question)) return 0;
-  if (isWrongQuestion(question)) return 1;
-  if (!item.attempts) return 2;
-  return 3;
+  if (isWrongQuestion(question)) return 0;
+  if (!item.attempts) return 1;
+  return 2;
 }
 
 function prioritized(items) {
@@ -1160,16 +1143,15 @@ function recordAnswer(question, answer) {
   item.bankVersion = BANK_VERSION;
   if (correct) {
     item.correct += 1;
-    const today = localDateKey();
-    if (item.lastCorrectDate !== today) item.streak += 1;
-    item.lastCorrectDate = today;
-    item.mastered = item.streak >= 2;
-    item.dueAt = dueDate(item.mastered ? 7 : 1);
+    item.lastCorrectDate = localDateKey();
+    item.mastered = true;
+    item.streak = 1;
+    item.dueAt = "";
   } else {
     item.wrong += 1;
     item.mastered = false;
     item.streak = 0;
-    item.dueAt = dueDate(1);
+    item.dueAt = "";
     item.wrongReason = "尚未標註";
   }
   progress[question.id] = item;
@@ -1244,7 +1226,7 @@ function renderQuiz() {
           <span class="mini-tag">原題第 ${escapeHTML(question.number)} 題</span>
         </div>
       </div>
-      <span class="muted">記憶 ${statsFor(question.id).streak} / 2</span>
+      <span class="muted">已作答 ${statsFor(question.id).attempts} 次</span>
     </div>
     ${focusGuideHTML(question)}
     <p class="question-stem">${annotatedText(questionText(question))}</p>
@@ -1316,13 +1298,13 @@ function renderSessionResult() {
 }
 
 function renderStats() {
-  const due = QUESTIONS.filter(isDueQuestion).length;
+  const attempted = QUESTIONS.filter((question) => statsFor(question.id).attempts > 0).length;
   const wrong = QUESTIONS.filter(isWrongQuestion).length;
-  const mastered = QUESTIONS.filter((question) => statsFor(question.id).mastered).length;
+  const unseen = QUESTIONS.length - attempted;
   $("#totalQuestions").textContent = QUESTIONS.length;
-  $("#attemptedQuestions").textContent = due;
+  $("#attemptedQuestions").textContent = attempted;
   $("#wrongQuestions").textContent = wrong;
-  $("#masteredQuestions").textContent = mastered;
+  $("#unseenQuestions").textContent = unseen;
   $("#generatedAt").textContent = `最新題庫：${DATA.bankVersion || DATA.generatedAt || "未標示"}，共 ${QUESTIONS.length} 題`;
   updatePoolInfo();
 }
@@ -1330,9 +1312,9 @@ function renderStats() {
 function renderSubjectProgress() {
   $("#subjectProgress").innerHTML = SUBJECTS.map((subject) => {
     const questions = QUESTIONS.filter((question) => question.subjectId === subject.id);
-    const mastered = questions.filter((question) => statsFor(question.id).mastered).length;
+    const attempted = questions.filter((question) => statsFor(question.id).attempts > 0).length;
     const wrong = questions.filter(isWrongQuestion).length;
-    const rate = questions.length ? Math.round((mastered / questions.length) * 100) : 0;
+    const rate = questions.length ? Math.round((attempted / questions.length) * 100) : 0;
     return `
       <article class="subject-row">
         <div>
@@ -1341,7 +1323,7 @@ function renderSubjectProgress() {
         </div>
         <div>
           <div class="bar"><span style="width:${rate}%"></span></div>
-          <p class="muted">熟練 ${mastered} / ${questions.length} 題，${rate}%</p>
+          <p class="muted">已作答 ${attempted} / ${questions.length} 題，${rate}%</p>
         </div>
         <div>
           <strong>${wrong}</strong>
@@ -1396,7 +1378,7 @@ function renderWrongs() {
   const wrongs = QUESTIONS.filter(isWrongQuestion);
   $("#wrongList").innerHTML = wrongs.length
     ? `
-      <div class="wrong-summary">共有 ${wrongs.length} 題尚未穩定；需隔日答對 2 次，系統才會自動移出。</div>
+      <div class="wrong-summary">共有 ${wrongs.length} 題待加強；之後答對 1 次，系統就會自動移出。</div>
       ${wrongs.map((question) => wrongQuestionItem(question)).join("")}`
     : `<div class="empty-state"><h2>目前沒有錯題</h2><p>答錯的題目會自動出現在這裡。</p></div>`;
 }
