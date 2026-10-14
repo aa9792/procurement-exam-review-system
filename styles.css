@@ -421,30 +421,6 @@ select,
   overflow-wrap: anywhere;
 }
 
-.focus-guide {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  border: 1px solid #cdd7e6;
-  background: #f7f9fc;
-}
-
-.focus-guide span {
-  min-width: 0;
-  padding: 9px 10px;
-  overflow-wrap: anywhere;
-}
-
-.focus-guide span + span {
-  border-left: 1px solid #cdd7e6;
-}
-
-.focus-guide b {
-  display: block;
-  margin-bottom: 2px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
 .focus-mark {
   border-radius: 2px;
   padding: 0 2px;
@@ -534,6 +510,37 @@ select,
   border-radius: 8px;
   background: #fff;
   padding: 12px;
+}
+
+.answer-details {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.answer-details > summary {
+  cursor: pointer;
+  padding: 12px 14px;
+  color: var(--accent-dark);
+  font-weight: 800;
+  user-select: none;
+}
+
+.answer-details > summary:hover {
+  background: var(--soft);
+}
+
+.answer-details[open] > summary {
+  border-bottom: 1px solid var(--line);
+  background: var(--soft);
+}
+
+.answer-details .explanation-block {
+  margin-top: 0;
+  border-top: 0;
+  padding: 14px;
 }
 
 .explanation-block h4 {
@@ -873,14 +880,6 @@ footer {
     font-size: 22px;
   }
 
-  .focus-guide {
-    grid-template-columns: 1fr;
-  }
-
-  .focus-guide span + span {
-    border-left: 0;
-    border-top: 1px solid #cdd7e6;
-  }
 }
 
 @media (max-width: 420px) {

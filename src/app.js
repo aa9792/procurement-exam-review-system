@@ -499,8 +499,6 @@ function questionText(question) {
 const FOCUS_PATTERN = /(不得|不應|不可|無須|不適用|非屬|何者非|錯誤|不正確|除外|應|須|得|可以|可|\d[\d,]*(?:\.\d+)?\s*(?:日|天|個月|年|%|％|萬元|億元|家|人|次)?)/g;
 const NEGATIVE_PATTERN = /不得|不應|不可|無須|不適用|非屬|何者非|錯誤|不正確|除外/;
 const NUMBER_PATTERN = /\d[\d,]*(?:\.\d+)?\s*(?:日|天|個月|年|%|％|萬元|億元|家|人|次)/g;
-const PROCEDURE_WORDS = ["招標", "審標", "評選", "決標", "議價", "履約", "驗收", "異議", "申訴", "調解"];
-const ACTOR_WORDS = ["評選委員會", "上級機關", "主管機關", "採購人員", "主驗人員", "機關", "廠商"];
 const NON_MODAL_PAIRS = new Set(["取得", "獲得", "所得", "值得", "得標", "得利", "因應", "對應", "相應", "反應", "應用", "應付", "可能", "可行", "可靠", "可見", "許可", "須知"]);
 
 function isLegalModalToken(text, index, token) {
@@ -538,29 +536,6 @@ function findModalToken(text) {
 
 function uniqueMatches(values) {
   return [...new Set(values.filter(Boolean))];
-}
-
-function questionFocus(question) {
-  const text = questionText(question);
-  const actor = ACTOR_WORDS.find((word) => text.includes(word)) || "行為主體";
-  const direction = text.match(NEGATIVE_PATTERN)?.[0] || (/正確|為是|合法|適法/.test(text) ? "找正確" : "判斷規則");
-  const numbers = uniqueMatches(text.match(NUMBER_PATTERN) || []).slice(0, 3);
-  const procedures = PROCEDURE_WORDS.filter((word) => text.includes(word)).slice(0, 3);
-  return {
-    actor,
-    direction,
-    detail: numbers.length ? numbers.join("、") : procedures.length ? procedures.join(" → ") : "條件與法律效果",
-  };
-}
-
-function focusGuideHTML(question) {
-  const focus = questionFocus(question);
-  return `
-    <div class="focus-guide" aria-label="本題答題重點">
-      <span><b>1 主詞</b>${escapeHTML(focus.actor)}</span>
-      <span><b>2 問法</b>${escapeHTML(focus.direction)}</span>
-      <span><b>3 鉤子</b>${escapeHTML(focus.detail)}</span>
-    </div>`;
 }
 
 function conciseRule(question, explanation) {
@@ -1019,15 +994,19 @@ function explanationHTML(question) {
   const memoryRule = conciseRule(question, explanation);
 
   return `
-    <div class="explanation-block">
-      <div class="correct-statement-block">
-        <strong>正確敘述・這題只記</strong>
-        <p class="memory-rule">${annotatedText(memoryRule)}</p>
-        <p>${escapeHTML(correctStatement)}</p>
-        <p class="answer-reason"><strong>為什麼：</strong>${escapeHTML(reason)}</p>
+    <details class="answer-details">
+      <summary>查看答案詳解</summary>
+      <div class="explanation-block">
+        <div class="correct-statement-block">
+          <strong>正確敘述・這題只記</strong>
+          <p class="memory-rule">${annotatedText(memoryRule)}</p>
+          <p>${escapeHTML(correctStatement)}</p>
+          <p class="answer-reason"><strong>為什麼：</strong>${escapeHTML(reason)}</p>
+        </div>
+        ${lawBasisHTML(question, explanation)}
+        <span class="source-path">來源：${escapeHTML(question.source)}</span>
       </div>
-      ${lawBasisHTML(question, explanation)}
-    </div>`;
+    </details>`;
 }
 
 function isWrongQuestion(question) {
@@ -1228,7 +1207,6 @@ function renderQuiz() {
       </div>
       <span class="muted">已作答 ${statsFor(question.id).attempts} 次</span>
     </div>
-    ${focusGuideHTML(question)}
     <p class="question-stem">${annotatedText(questionText(question))}</p>
     <div class="options ${question.type === "tf" ? "tf-options" : ""}"></div>
     <div id="answerBox" class="${result ? `answer-box ${result.correct ? "is-correct" : "is-wrong"}` : "hidden"}"></div>
@@ -1258,8 +1236,7 @@ function renderQuiz() {
       你的答案：${escapeHTML(answerLabel(question, result.answer))}<br>
       標準答案：${escapeHTML(answerLabel(question))}<br>
       ${!result.correct ? wrongReasonHTML(question) : ""}
-      ${explanationHTML(question)}
-      <span class="source-path">來源：${escapeHTML(question.source)}</span>`;
+      ${explanationHTML(question)}`;
     $$('[data-wrong-reason]').forEach((button) => {
       button.addEventListener("click", () => setWrongReason(question.id, button.dataset.wrongReason));
     });
@@ -1346,9 +1323,6 @@ function questionCard(question) {
       <p>${escapeHTML(questionText(question))}</p>
       <p><strong>標準答案：</strong>${escapeHTML(answerLabel(question))}</p>
       ${explanationHTML(question)}
-      <div class="card-actions">
-        <span class="source-path">${escapeHTML(question.source)}</span>
-      </div>
     </article>`;
 }
 
@@ -1362,14 +1336,10 @@ function wrongQuestionItem(question) {
         <span class="wrong-count">錯 ${stat.wrong || 0} 次</span>
       </summary>
       <div class="wrong-detail">
-        ${focusGuideHTML(question)}
         <p>${annotatedText(questionText(question))}</p>
         <p><strong>標準答案：</strong>${escapeHTML(answerLabel(question))}</p>
         <p class="wrong-cause"><strong>上次錯因：</strong>${escapeHTML(stat.wrongReason || "尚未標註")}</p>
         ${explanationHTML(question)}
-        <div class="card-actions">
-          <span class="source-path">${escapeHTML(question.source)}</span>
-        </div>
       </div>
     </details>`;
 }
