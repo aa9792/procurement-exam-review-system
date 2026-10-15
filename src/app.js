@@ -538,6 +538,24 @@ function uniqueMatches(values) {
   return [...new Set(values.filter(Boolean))];
 }
 
+function keyMemoryPart(value, maxLength = 24) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  const focus = [...text.matchAll(FOCUS_PATTERN)].find((match) =>
+    isLegalModalToken(text, match.index, match[0]),
+  );
+  if (!focus) return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
+  const start = Math.max(0, focus.index - 6);
+  const end = Math.min(text.length, focus.index + focus[0].length + 16);
+  return `${start ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}`;
+}
+
+function memoryReplacement(explanation) {
+  return {
+    wrong: keyMemoryPart(explanation?.wrongPart),
+    correct: keyMemoryPart(explanation?.correctPart),
+  };
+}
+
 function conciseRule(question, explanation) {
   const correctText =
     question.type === "choice"
@@ -546,7 +564,8 @@ function conciseRule(question, explanation) {
   const shortRule = correctText.length > 96 ? `${correctText.slice(0, 96)}…` : correctText;
   const numbers = uniqueMatches(correctText.match(NUMBER_PATTERN) || []).slice(0, 3);
   if (question.answer === "X" && explanation?.wrongPart && explanation?.correctPart) {
-    return `改錯字：把「${explanation.wrongPart}」改成「${explanation.correctPart}」。`;
+    const replacement = memoryReplacement(explanation);
+    return `替換「${replacement.wrong}」→「${replacement.correct}」。`;
   }
   if (question.type === "choice" && explanation?.intent?.asksWrong) {
     const reference = lawReferences(question)[0];
@@ -563,8 +582,44 @@ function conciseRule(question, explanation) {
   return shortRule;
 }
 
-function sourceFileName(source) {
-  return String(source || "").split(/[\\/]/).pop();
+function memoryCue(question, explanation) {
+  const stem = questionText(question);
+  if (question.type === "choice" && explanation?.intent?.asksWrong) {
+    const reverseWord = stem.match(NEGATIVE_PATTERN)?.[0] || "錯誤／例外";
+    return `先圈題幹的「${reverseWord}」；答案是錯誤或例外選項，只背正確規則，不要背答案原句。`;
+  }
+  if (question.answer === "X" && explanation?.wrongPart && explanation?.correctPart) {
+    const replacement = memoryReplacement(explanation);
+    const wrongModal = findModalToken(replacement.wrong);
+    const correctModal = findModalToken(replacement.correct);
+    if (wrongModal && correctModal && wrongModal !== correctModal) {
+      return `先比較權限詞：本題是「${wrongModal}」與「${correctModal}」的差別；用上方替換句判斷禁止、義務或允許。`;
+    }
+    return "是非題先找被改動的主體、條件、數字或權限詞，再用上方替換句還原正確規則。";
+  }
+  const correctText =
+    question.type === "choice"
+      ? question.options?.[Number(question.answer) - 1] || ""
+      : explanation?.correctedStatement || stem;
+  const numbers = uniqueMatches(correctText.match(NUMBER_PATTERN) || []).slice(0, 3);
+  if (numbers.length) {
+    return `不要只背數字「${numbers.join("、")}」，要連同適用對象、前提與期限一起記。`;
+  }
+  const modal = findModalToken(correctText);
+  if (modal) {
+    return `先判斷法律強度「${modal}」：應／須是義務、得／可是可以、不得是禁止，不能互換。`;
+  }
+  return "先確認誰可以或必須做，再核對適用條件、程序順序與最後法律效果。";
+}
+
+function wrongMemoryHTML(question) {
+  const explanation = EXPLANATION_ENGINE?.explain(question);
+  return `
+    <div class="wrong-memory-tip">
+      <strong>錯題記憶重點</strong>
+      <p><b>只記這句：</b>${annotatedText(conciseRule(question, explanation))}</p>
+      <p><b>下次這樣判斷：</b>${escapeHTML(memoryCue(question, explanation))}</p>
+    </div>`;
 }
 
 function questionTypeLabel(type) {
@@ -977,7 +1032,7 @@ function lawBasisHTML(question, explanation) {
     </div>`;
 }
 
-function explanationHTML(question) {
+function explanationHTML(question, showMemoryRule = true) {
   const explanation = EXPLANATION_ENGINE?.explain(question);
   const correctStatement =
     question.type === "choice"
@@ -998,8 +1053,8 @@ function explanationHTML(question) {
       <summary>查看答案詳解</summary>
       <div class="explanation-block">
         <div class="correct-statement-block">
-          <strong>正確敘述・這題只記</strong>
-          <p class="memory-rule">${annotatedText(memoryRule)}</p>
+          <strong>${showMemoryRule ? "正確敘述・這題只記" : "正確敘述"}</strong>
+          ${showMemoryRule ? `<p class="memory-rule">${annotatedText(memoryRule)}</p>` : ""}
           <p>${escapeHTML(correctStatement)}</p>
           <p class="answer-reason"><strong>為什麼：</strong>${escapeHTML(reason)}</p>
         </div>
@@ -1235,8 +1290,9 @@ function renderQuiz() {
       <strong>${result.correct ? "答對。" : "答錯。"}</strong>
       你的答案：${escapeHTML(answerLabel(question, result.answer))}<br>
       標準答案：${escapeHTML(answerLabel(question))}<br>
+      ${!result.correct ? wrongMemoryHTML(question) : ""}
       ${!result.correct ? wrongReasonHTML(question) : ""}
-      ${explanationHTML(question)}`;
+      ${explanationHTML(question, result.correct)}`;
     $$('[data-wrong-reason]').forEach((button) => {
       button.addEventListener("click", () => setWrongReason(question.id, button.dataset.wrongReason));
     });
@@ -1338,8 +1394,9 @@ function wrongQuestionItem(question) {
       <div class="wrong-detail">
         <p>${annotatedText(questionText(question))}</p>
         <p><strong>標準答案：</strong>${escapeHTML(answerLabel(question))}</p>
+        ${wrongMemoryHTML(question)}
         <p class="wrong-cause"><strong>上次錯因：</strong>${escapeHTML(stat.wrongReason || "尚未標註")}</p>
-        ${explanationHTML(question)}
+        ${explanationHTML(question, false)}
       </div>
     </details>`;
 }

@@ -585,6 +585,27 @@ select,
   padding-top: 10px;
 }
 
+.wrong-memory-tip {
+  margin-top: 14px;
+  border-left: 4px solid #c58a00;
+  background: #fff8dc;
+  padding: 11px 12px;
+}
+
+.wrong-memory-tip > strong {
+  color: #6e4c00;
+  font-size: 17px;
+}
+
+.wrong-memory-tip p {
+  margin: 7px 0 0;
+  line-height: 1.65;
+}
+
+.wrong-memory-tip b {
+  color: #5e4300;
+}
+
 .wrong-reasons > div {
   display: flex;
   flex-wrap: wrap;
