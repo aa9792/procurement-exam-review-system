@@ -355,6 +355,10 @@ h3 {
   padding: 18px;
 }
 
+.quiz-panel {
+  scroll-margin-top: 12px;
+}
+
 .controls-panel {
   position: sticky;
   top: 12px;

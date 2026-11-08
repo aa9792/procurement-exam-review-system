@@ -1222,6 +1222,12 @@ function wrongReasonHTML(question) {
     </div>`;
 }
 
+function keepQuizQuestionInView() {
+  requestAnimationFrame(() => {
+    document.querySelector(".quiz-panel")?.scrollIntoView({ block: "start", behavior: "auto" });
+  });
+}
+
 function renderQuiz() {
   session = session.filter((question) => question && !isPlaceholderQuestion(question));
   if (sessionIndex >= session.length) sessionIndex = Math.max(session.length - 1, 0);
@@ -1308,6 +1314,7 @@ function renderQuiz() {
     if (sessionIndex < session.length - 1) {
       sessionIndex += 1;
       renderQuiz();
+      keepQuizQuestionInView();
       return;
     }
     renderSessionResult();
