@@ -1347,6 +1347,8 @@ function renderStats() {
   $("#attemptedQuestions").textContent = attempted;
   $("#wrongQuestions").textContent = wrong;
   $("#unseenQuestions").textContent = unseen;
+  $("#progressSummaryCount").textContent = `已練 ${attempted} / ${QUESTIONS.length} 題`;
+  $("#wrongSummaryCount").textContent = `目前 ${wrong} 題`;
   $("#generatedAt").textContent = `最新題庫：${DATA.bankVersion || DATA.generatedAt || "未標示"}，共 ${QUESTIONS.length} 題`;
   updatePoolInfo();
 }
@@ -1625,6 +1627,12 @@ function bindEvents() {
   $("#clearLawSearchBtn")?.addEventListener("click", () => setLawSearch(""));
   $$('[data-law-query]').forEach((button) => {
     button.addEventListener("click", () => setLawSearch(button.dataset.lawQuery));
+  });
+  $$('.page-tabs a[href="#progress"], .page-tabs a[href="#wrong-review"]').forEach((link) => {
+    link.addEventListener("click", () => {
+      const target = document.querySelector(link.getAttribute("href"));
+      if (target instanceof HTMLDetailsElement) target.open = true;
+    });
   });
   $("#backToQuizBtn")?.addEventListener("click", () => {
     document.querySelector(".quiz-panel")?.scrollIntoView({ block: "start", behavior: "auto" });

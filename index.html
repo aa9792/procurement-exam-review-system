@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>採購證照複習系統</title>
-    <link rel="stylesheet" href="./styles.css?v=1151108.2" />
+    <link rel="stylesheet" href="./styles.css?v=1151108.3" />
   </head>
   <body>
     <header class="app-header">
@@ -147,24 +147,36 @@
         </section>
       </section>
 
-      <section id="progress" class="panel progress-panel">
-        <div class="section-title">
-          <h2>科目進度</h2>
+      <details id="progress" class="panel progress-panel section-disclosure">
+        <summary class="section-disclosure-summary">
+          <span class="section-disclosure-copy">
+            <strong>科目進度</strong>
+            <span>展開查看各科完成比例與錯題數</span>
+          </span>
+          <span id="progressSummaryCount" class="section-disclosure-count">已練 0 / 0 題</span>
+        </summary>
+        <div class="section-disclosure-body">
           <p class="muted">每題完成作答 1 次就計入進度；答錯題目在之後答對 1 次即移出錯題本。</p>
+          <div id="subjectProgress" class="subject-list"></div>
         </div>
-        <div id="subjectProgress" class="subject-list"></div>
-      </section>
+      </details>
 
-      <section id="wrong-review" class="panel review-panel">
-        <div class="section-title split">
-          <div>
-            <h2>錯題複習</h2>
+      <details id="wrong-review" class="panel review-panel section-disclosure">
+        <summary class="section-disclosure-summary">
+          <span class="section-disclosure-copy">
+            <strong>錯題複習</strong>
+            <span>展開查看記憶重點與完整詳解</span>
+          </span>
+          <span id="wrongSummaryCount" class="section-disclosure-count">目前 0 題</span>
+        </summary>
+        <div class="section-disclosure-body">
+          <div class="section-disclosure-toolbar">
             <p class="muted">保留錯因方便複習；錯題之後答對 1 次，就會自動移出錯題本。</p>
+            <button id="refreshWrongBtn" type="button">更新錯題</button>
           </div>
-          <button id="refreshWrongBtn" type="button">更新錯題</button>
+          <div id="wrongList" class="question-list"></div>
         </div>
-        <div id="wrongList" class="question-list"></div>
-      </section>
+      </details>
 
       <section id="bank-search" class="panel bank-panel">
         <div class="section-title split">
@@ -217,13 +229,13 @@
       <span>未登入時進度儲存在本機瀏覽器；Google 或 Email 登入後會同步練習紀錄。</span>
     </footer>
 
-    <script src="./data/questions.js?v=1151108.2"></script>
-    <script src="./data/chapter-charts.js?v=1151108.2"></script>
-    <script src="./data/compendium.js?v=1151108.2"></script>
-    <script src="./src/explanations.js?v=1151108.2"></script>
+    <script src="./data/questions.js?v=1151108.3"></script>
+    <script src="./data/chapter-charts.js?v=1151108.3"></script>
+    <script src="./data/compendium.js?v=1151108.3"></script>
+    <script src="./src/explanations.js?v=1151108.3"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
-    <script src="./src/app.js?v=1151108.2"></script>
+    <script src="./src/app.js?v=1151108.3"></script>
   </body>
 </html>

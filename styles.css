@@ -708,8 +708,97 @@ select,
 
 .progress-panel,
 .review-panel,
-.bank-panel {
+.bank-panel,
+.compendium-panel {
   margin-top: 14px;
+}
+
+details.section-disclosure {
+  overflow: hidden;
+  padding: 0;
+}
+
+.section-disclosure-summary {
+  position: relative;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 72px;
+  padding: 14px 18px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.section-disclosure-summary::-webkit-details-marker {
+  display: none;
+}
+
+.section-disclosure-summary::after {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  margin-left: 2px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  content: "";
+  transform: rotate(45deg);
+  transition: transform 160ms ease;
+}
+
+.section-disclosure[open] > .section-disclosure-summary::after {
+  transform: rotate(225deg);
+}
+
+.section-disclosure-summary:hover {
+  background: var(--soft);
+}
+
+.section-disclosure-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.section-disclosure-copy strong {
+  font-size: 20px;
+}
+
+.section-disclosure-copy span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.section-disclosure-count {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--accent-dark);
+  padding: 5px 10px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.section-disclosure-body {
+  border-top: 1px solid var(--line);
+  padding: 18px;
+}
+
+.section-disclosure-body > .muted {
+  margin-bottom: 14px;
+}
+
+.section-disclosure-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.section-disclosure-toolbar p {
+  margin: 0;
 }
 
 .section-title {
@@ -996,6 +1085,30 @@ footer {
     flex-direction: column;
   }
 
+  .section-disclosure-summary,
+  .section-disclosure-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .section-disclosure-summary {
+    padding-right: 42px;
+  }
+
+  .section-disclosure-summary::after {
+    position: absolute;
+    top: 25px;
+    right: 20px;
+  }
+
+  .section-disclosure-count {
+    align-self: flex-start;
+  }
+
+  .section-disclosure-toolbar button {
+    width: 100%;
+  }
+
   .law-search-row {
     grid-template-columns: 1fr;
   }
@@ -1024,6 +1137,10 @@ footer {
   .review-panel,
   .bank-panel,
   .compendium-panel {
+    padding: 14px;
+  }
+
+  .section-disclosure-body {
     padding: 14px;
   }
 
