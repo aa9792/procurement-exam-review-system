@@ -1486,8 +1486,9 @@ function lawQueryGroups(keyword) {
     .map(lawTokenAliases);
 }
 
-const LAW_PAGE_INDEX = (COMPENDIUM.pages || []).map((page) => ({
+const LAW_PAGE_INDEX = (COMPENDIUM.pages || []).map((page, sourceIndex) => ({
   ...page,
+  sourceIndex,
   searchText: normalizeLawSearch(`${page.title || ""} ${page.text || ""}`),
 }));
 
@@ -1501,67 +1502,115 @@ function highlightLawText(value, aliases) {
     .join("");
 }
 
-function lawSnippet(page, aliasGroups) {
-  const text = String(page.text || "").replace(/\s+/g, " ").trim();
-  const aliases = aliasGroups.flat();
-  const lowered = text.toLocaleLowerCase("zh-Hant");
-  const positions = aliases
-    .map((alias) => lowered.indexOf(alias.toLocaleLowerCase("zh-Hant")))
-    .filter((index) => index >= 0);
-  const hit = positions.length ? Math.min(...positions) : 0;
-  const start = Math.max(0, hit - 110);
-  const end = Math.min(text.length, hit + 260);
-  const snippet = `${start ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}`;
-  return highlightLawText(snippet, aliases);
+function cleanLawText(value) {
+  return String(value || "")
+    .replace(/\r/g, "")
+    .replace(/第\s*\n\s*(?=[零一二三四五六七八九十百千\d])/g, "第")
+    .replace(/^\s*總\d+(?:\s+總\d+)?\s*$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
-function lawResultHTML(page, aliasGroups) {
+const LAW_ARTICLE_PATTERN = /(?:^|\n)(?=(?:細則\s*)?第\s*[零一二三四五六七八九十百千\d]+\s*條(?:\s*之\s*[零一二三四五六七八九十百千\d]+)?)/g;
+
+function lawArticleStarts(text) {
+  return [...text.matchAll(LAW_ARTICLE_PATTERN)].map((match) => match.index + (match[0] === "\n" ? 1 : 0));
+}
+
+function lawArticleKey(value) {
+  return normalizeLawSearch(value).match(/^(細則)?第[零一二三四五六七八九十百千\d]+條(?:之[零一二三四五六七八九十百千\d]+)?/)?.[0] || "";
+}
+
+function lawContinuation(page, articleKey) {
+  let continuation = "";
+  for (let index = page.sourceIndex + 1; index < LAW_PAGE_INDEX.length; index += 1) {
+    const nextText = cleanLawText(LAW_PAGE_INDEX[index].text);
+    const nextStarts = lawArticleStarts(nextText);
+    const repeatsArticle = nextStarts.some((start) => lawArticleKey(nextText.slice(start)) === articleKey);
+    if (repeatsArticle) continue;
+    continuation += `\n${nextStarts.length ? nextText.slice(0, nextStarts[0]).trim() : nextText}`;
+    if (nextStarts.length || continuation.length > 20000) break;
+  }
+  return continuation.trim();
+}
+
+function lawProvisionBlocks(page) {
+  const text = cleanLawText(page.text);
+  if (!text) return [];
+
+  const starts = lawArticleStarts(text);
+  if (!starts.length) return [text];
+  return starts
+    .map((start, index) => {
+      const content = text.slice(start, starts[index + 1] ?? text.length).trim();
+      return index === starts.length - 1 ? `${content}\n${lawContinuation(page, lawArticleKey(content))}`.trim() : content;
+    })
+    .filter(Boolean);
+}
+
+function matchesLawGroups(value, aliasGroups) {
+  const normalized = normalizeLawSearch(value);
+  return aliasGroups.every((aliases) => aliases.some((alias) => normalized.includes(normalizeLawSearch(alias))));
+}
+
+function directArticleMatch(content, aliasGroups) {
+  const articleGroups = aliasGroups.filter((aliases) =>
+    aliases.some((alias) => /^第?[零一二三四五六七八九十百千\d]+條/.test(normalizeLawSearch(alias))),
+  );
+  if (!articleGroups.length) return false;
+  const heading = normalizeLawSearch(String(content).split("\n", 1)[0]);
+  return articleGroups.every((aliases) => aliases.some((alias) => {
+    const normalizedAlias = normalizeLawSearch(alias);
+    return heading.startsWith(normalizedAlias) || heading.startsWith(`細則${normalizedAlias}`);
+  }));
+}
+
+function matchingLawProvisions(pages, aliasGroups) {
+  const unique = new Set();
+  const provisions = [];
+  const directArticles = [];
+  pages.forEach((page) => {
+    lawProvisionBlocks(page).forEach((content) => {
+      if (!matchesLawGroups(content, aliasGroups)) return;
+      const key = normalizeLawSearch(content);
+      if (!key || unique.has(key)) return;
+      unique.add(key);
+      provisions.push(content);
+      if (directArticleMatch(content, aliasGroups)) directArticles.push(content);
+    });
+  });
+  return directArticles.length ? directArticles : provisions;
+}
+
+function lawResultHTML(content, aliasGroups) {
   const aliases = aliasGroups.flat();
   return `
     <article class="law-result">
-      <div class="law-result-heading">
-        <div>
-          <span class="law-page-number">PDF 第 ${page.page} 頁</span>
-          <h3>${highlightLawText(page.title || `彙編第 ${page.page} 頁`, aliases)}</h3>
-        </div>
-      </div>
-      <p class="law-snippet">${lawSnippet(page, aliasGroups)}</p>
-      <details class="law-page-details">
-        <summary>展開本頁完整內容</summary>
-        <div class="law-page-text">${highlightLawText(page.text || "本頁無可擷取文字。", aliases)}</div>
-      </details>
+      <div class="law-page-text">${highlightLawText(content, aliases)}</div>
     </article>`;
 }
 
 function renderLawSearch() {
   const input = $("#lawSearchInput");
   const results = $("#lawSearchResults");
-  const status = $("#lawSearchStatus");
-  if (!input || !results || !status) return;
+  if (!input || !results) return;
   const keyword = input.value.trim();
-  const pageCount = COMPENDIUM.meta?.pageCount || LAW_PAGE_INDEX.length;
-  const indexedPageCount = COMPENDIUM.meta?.indexedPageCount || LAW_PAGE_INDEX.length;
   if (!LAW_PAGE_INDEX.length) {
-    status.textContent = "法規彙編索引尚未載入。";
-    results.innerHTML = `<div class="empty-state compact"><p>目前無法讀取彙編資料，請重新整理頁面。</p></div>`;
+    results.innerHTML = `<div class="empty-state compact"><p>目前無法讀取法條，請重新整理頁面。</p></div>`;
     return;
   }
   if (!keyword) {
-    status.textContent = `彙編共 ${pageCount} 頁，已索引 ${indexedPageCount} 頁法規內容；查詢不會改變目前題目或作答順序。`;
-    results.innerHTML = `<div class="empty-state compact"><p>輸入法規名稱、條號或關鍵字後顯示彙編內容。</p></div>`;
+    results.innerHTML = `<div class="empty-state compact"><p>輸入條號或關鍵字後，這裡只顯示相關法條內容。</p></div>`;
     return;
   }
   const groups = lawQueryGroups(keyword);
-  const matched = LAW_PAGE_INDEX.filter((page) =>
+  const matchedPages = LAW_PAGE_INDEX.filter((page) =>
     groups.every((aliases) => aliases.some((alias) => page.searchText.includes(normalizeLawSearch(alias)))),
   );
-  const shown = matched.slice(0, 60);
-  status.textContent = matched.length > shown.length
-    ? `找到 ${matched.length} 頁，先顯示前 ${shown.length} 頁。`
-    : `找到 ${matched.length} 頁。`;
+  const shown = matchingLawProvisions(matchedPages, groups).slice(0, 30);
   results.innerHTML = shown.length
-    ? shown.map((page) => lawResultHTML(page, groups)).join("")
-    : `<div class="empty-state compact"><p>找不到符合「${escapeHTML(keyword)}」的彙編內容。</p></div>`;
+    ? shown.map((content) => lawResultHTML(content, groups)).join("")
+    : `<div class="empty-state compact"><p>找不到符合「${escapeHTML(keyword)}」的法條。</p></div>`;
 }
 
 function setLawSearch(keyword) {
@@ -1625,17 +1674,11 @@ function bindEvents() {
     lawSearchTimer = setTimeout(renderLawSearch, 140);
   });
   $("#clearLawSearchBtn")?.addEventListener("click", () => setLawSearch(""));
-  $$('[data-law-query]').forEach((button) => {
-    button.addEventListener("click", () => setLawSearch(button.dataset.lawQuery));
-  });
   $$('.page-tabs a[href="#progress"], .page-tabs a[href="#wrong-review"]').forEach((link) => {
     link.addEventListener("click", () => {
       const target = document.querySelector(link.getAttribute("href"));
       if (target instanceof HTMLDetailsElement) target.open = true;
     });
-  });
-  $("#backToQuizBtn")?.addEventListener("click", () => {
-    document.querySelector(".quiz-panel")?.scrollIntoView({ block: "start", behavior: "auto" });
   });
   $("#loginBtn")?.addEventListener("click", loginWithGoogle);
   $("#toggleEmailAuthBtn")?.addEventListener("click", toggleEmailAuthPanel);
