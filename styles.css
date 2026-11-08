@@ -951,9 +951,23 @@ details.section-disclosure {
 }
 
 .law-page-text {
-  white-space: pre-wrap;
-  line-height: 1.75;
+  display: grid;
+  gap: 12px;
   overflow-wrap: anywhere;
+}
+
+.law-paragraph {
+  margin: 0;
+  line-height: 1.85;
+}
+
+.law-list-item {
+  padding-left: 1.7em;
+  text-indent: -1.7em;
+}
+
+.law-article-heading {
+  color: var(--accent-dark);
 }
 
 .hidden {

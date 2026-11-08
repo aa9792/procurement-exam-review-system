@@ -1590,11 +1590,43 @@ function matchingLawProvisions(pages, aliasGroups) {
   return sortLawBeforeRules(directArticles.length ? directArticles : provisions);
 }
 
+function startsLawParagraph(line) {
+  return /^(?:(?:細則\s*)?第\s*[零○〇一二三四五六七八九十百千\d]+\s*(?:章|條)(?:\s*之\s*[零○〇一二三四五六七八九十百千\d]+)?|[一二三四五六七八九十百千]+、|[（(][一二三四五六七八九十\d]+[）)]|\d+[.、]|(?:前(?:項|二項|三項|四項)|第[零○〇一二三四五六七八九十百千\d]+項|本法第[零○〇一二三四五六七八九十百千\d]+條))/.test(line);
+}
+
+function joinLawLine(left, right) {
+  return /[A-Za-z\d)]$/.test(left) && /^[A-Za-z\d(]/.test(right) ? `${left} ${right}` : `${left}${right}`;
+}
+
+function lawParagraphs(content) {
+  const paragraphs = [];
+  let current = "";
+  String(content || "").split(/\n+/).map((line) => line.trim()).filter(Boolean).forEach((line) => {
+    if (current && startsLawParagraph(line)) {
+      paragraphs.push(current);
+      current = line;
+      return;
+    }
+    current = current ? joinLawLine(current, line) : line;
+  });
+  if (current) paragraphs.push(current);
+  return paragraphs;
+}
+
+function lawParagraphHTML(paragraph, aliases) {
+  const isListItem = /^(?:[一二三四五六七八九十百千]+、|[（(][一二三四五六七八九十\d]+[）)]|\d+[.、])/.test(paragraph);
+  const article = paragraph.match(/^((?:細則\s*)?第\s*[零○〇一二三四五六七八九十百千\d]+\s*條(?:\s*之\s*[零○〇一二三四五六七八九十百千\d]+)?)(.*)$/);
+  const body = article
+    ? `<strong class="law-article-heading">${highlightLawText(article[1], aliases)}</strong>${article[2] ? ` ${highlightLawText(article[2].trim(), aliases)}` : ""}`
+    : highlightLawText(paragraph, aliases);
+  return `<p class="law-paragraph${isListItem ? " law-list-item" : ""}">${body}</p>`;
+}
+
 function lawResultHTML(content, aliasGroups) {
   const aliases = aliasGroups.flat();
   return `
     <article class="law-result">
-      <div class="law-page-text">${highlightLawText(content, aliases)}</div>
+      <div class="law-page-text">${lawParagraphs(content).map((paragraph) => lawParagraphHTML(paragraph, aliases)).join("")}</div>
     </article>`;
 }
 
