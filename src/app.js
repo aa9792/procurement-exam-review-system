@@ -1688,6 +1688,9 @@ function bindEvents() {
       if (target instanceof HTMLDetailsElement) target.open = true;
     });
   });
+  $("#backToQuizBtn")?.addEventListener("click", () => {
+    document.querySelector(".quiz-panel")?.scrollIntoView({ block: "start", behavior: "auto" });
+  });
   $("#loginBtn")?.addEventListener("click", loginWithGoogle);
   $("#toggleEmailAuthBtn")?.addEventListener("click", toggleEmailAuthPanel);
   $("#emailLoginBtn")?.addEventListener("click", loginWithEmail);
