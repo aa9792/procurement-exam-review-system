@@ -1565,6 +1565,14 @@ function directArticleMatch(content, aliasGroups) {
   }));
 }
 
+function sortLawBeforeRules(contents) {
+  return [...contents].sort((left, right) => {
+    const leftIsRules = lawArticleKey(left).startsWith("細則");
+    const rightIsRules = lawArticleKey(right).startsWith("細則");
+    return Number(leftIsRules) - Number(rightIsRules);
+  });
+}
+
 function matchingLawProvisions(pages, aliasGroups) {
   const unique = new Set();
   const provisions = [];
@@ -1579,7 +1587,7 @@ function matchingLawProvisions(pages, aliasGroups) {
       if (directArticleMatch(content, aliasGroups)) directArticles.push(content);
     });
   });
-  return directArticles.length ? directArticles : provisions;
+  return sortLawBeforeRules(directArticles.length ? directArticles : provisions);
 }
 
 function lawResultHTML(content, aliasGroups) {
