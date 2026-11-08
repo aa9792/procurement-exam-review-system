@@ -12,6 +12,7 @@
 - 題幹自動標示反向問法、數字與法律強度，並提示主詞、問法、記憶鉤子
 - 每題完成作答 1 次就計入科目進度；錯題重答正確 1 次即移出錯題本
 - 詳解只保留正確規則與法規依據，反向題不會把錯誤選項當口訣
+- 內建《政府採購法令彙編第 35 版》全文查詢，可依條號與關鍵字搜尋且不影響作答題序
 - 使用 Firebase 登入同步，未登入時以瀏覽器 localStorage 保存進度
 
 ## 使用方式
@@ -29,6 +30,14 @@
 ```powershell
 python scripts/import_combined_question_bank.py "C:\path\to\全部題庫.pdf"
 ```
+
+重新建立法規彙編索引：
+
+```powershell
+python scripts/build_compendium_index.py --source "C:\path\to\政府採購法令彙編.pdf"
+```
+
+彙編原始 PDF 未放入 repo；網頁使用產生後的 `data/compendium.js` 離線全文索引。
 
 ## Firebase 同步
 

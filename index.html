@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>採購證照複習系統</title>
-    <link rel="stylesheet" href="./styles.css?v=1151108" />
+    <link rel="stylesheet" href="./styles.css?v=1151108.2" />
   </head>
   <body>
     <header class="app-header">
@@ -66,6 +66,7 @@
         <a href="#progress">科目進度</a>
         <a href="#wrong-review">錯題複習</a>
         <a href="#bank-search">題庫搜尋</a>
+        <a href="#law-compendium">法規彙編</a>
         <a
           class="assistant-tab"
           href="https://gemini.google.com/gem/1CL4gw9ciot8KvZyw03xn5CK5sZaLI681?usp=sharing"
@@ -175,6 +176,40 @@
         </div>
         <div id="bankList" class="question-list"></div>
       </section>
+
+      <section id="law-compendium" class="panel compendium-panel">
+        <div class="section-title split compendium-heading">
+          <div>
+            <h2>法規彙編查詢</h2>
+            <p class="muted">搜尋《政府採購法令彙編第 35 版》（2025-05-14）的法規名稱、條號或關鍵字，不影響目前作答題序。</p>
+          </div>
+          <button id="backToQuizBtn" type="button">回到目前題目</button>
+        </div>
+        <div class="law-search-row">
+          <label class="law-search-field">
+            <span>查詢內容</span>
+            <input
+              id="lawSearchInput"
+              class="search"
+              type="search"
+              placeholder="例如：第 22 條、最有利標、履約保證金"
+              autocomplete="off"
+            />
+          </label>
+          <button id="clearLawSearchBtn" type="button">清除</button>
+        </div>
+        <div class="law-quick-search" aria-label="常用查詢">
+          <span>常用：</span>
+          <button type="button" data-law-query="政府採購法">政府採購法</button>
+          <button type="button" data-law-query="施行細則">施行細則</button>
+          <button type="button" data-law-query="第 22 條">第 22 條</button>
+          <button type="button" data-law-query="最有利標">最有利標</button>
+          <button type="button" data-law-query="履約保證金">履約保證金</button>
+          <button type="button" data-law-query="申訴">申訴</button>
+        </div>
+        <p id="lawSearchStatus" class="law-search-status" aria-live="polite"></p>
+        <div id="lawSearchResults" class="law-results"></div>
+      </section>
     </main>
 
     <footer>
@@ -182,12 +217,13 @@
       <span>未登入時進度儲存在本機瀏覽器；Google 或 Email 登入後會同步練習紀錄。</span>
     </footer>
 
-    <script src="./data/questions.js?v=1151108"></script>
-    <script src="./data/chapter-charts.js?v=1151108"></script>
-    <script src="./src/explanations.js?v=1151108"></script>
+    <script src="./data/questions.js?v=1151108.2"></script>
+    <script src="./data/chapter-charts.js?v=1151108.2"></script>
+    <script src="./data/compendium.js?v=1151108.2"></script>
+    <script src="./src/explanations.js?v=1151108.2"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
-    <script src="./src/app.js?v=1151108"></script>
+    <script src="./src/app.js?v=1151108.2"></script>
   </body>
 </html>

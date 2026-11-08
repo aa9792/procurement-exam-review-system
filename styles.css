@@ -351,7 +351,8 @@ h3 {
 .quiz-panel,
 .progress-panel,
 .review-panel,
-.bank-panel {
+.bank-panel,
+.compendium-panel {
   padding: 18px;
 }
 
@@ -830,6 +831,100 @@ select,
   overflow-wrap: anywhere;
 }
 
+.compendium-heading {
+  align-items: flex-start;
+}
+
+.law-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.law-search-field {
+  margin: 0;
+}
+
+.law-quick-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.law-quick-search > span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.law-quick-search button {
+  min-height: 34px;
+  padding: 5px 10px;
+  font-size: 14px;
+}
+
+.law-search-status {
+  margin: 16px 0 10px;
+  color: var(--muted);
+}
+
+.law-results {
+  display: grid;
+  gap: 10px;
+}
+
+.law-result {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 14px;
+}
+
+.law-result h3 {
+  margin: 4px 0 0;
+  line-height: 1.45;
+}
+
+.law-page-number {
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.law-snippet {
+  margin: 10px 0;
+  line-height: 1.75;
+}
+
+.law-search-highlight {
+  background: #fff0a8;
+  color: #513a00;
+  padding: 0 2px;
+}
+
+.law-page-details {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.law-page-details summary {
+  color: var(--accent-dark);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.law-page-text {
+  margin-top: 12px;
+  border-left: 3px solid var(--line);
+  background: var(--soft);
+  padding: 12px;
+  white-space: pre-wrap;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
 .hidden {
   display: none !important;
 }
@@ -901,6 +996,15 @@ footer {
     flex-direction: column;
   }
 
+  .law-search-row {
+    grid-template-columns: 1fr;
+  }
+
+  .law-search-row button,
+  #backToQuizBtn {
+    width: 100%;
+  }
+
   .question-stem {
     font-size: 22px;
   }
@@ -918,7 +1022,8 @@ footer {
   .quiz-panel,
   .progress-panel,
   .review-panel,
-  .bank-panel {
+  .bank-panel,
+  .compendium-panel {
     padding: 14px;
   }
 
