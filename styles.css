@@ -397,6 +397,21 @@ select,
   margin-bottom: 14px;
 }
 
+.similar-session-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-bottom: 14px;
+  border-left: 4px solid var(--accent);
+  background: var(--soft);
+  padding: 10px 12px;
+}
+
+.similar-session-banner span {
+  color: var(--muted);
+}
+
 .question-meta {
   display: flex;
   flex-wrap: wrap;
@@ -505,6 +520,21 @@ select,
 
 .answer-box.is-wrong {
   border-color: var(--danger);
+}
+
+.similar-practice-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.similar-practice-action span {
+  color: var(--muted);
+  font-size: 14px;
 }
 
 .explanation-block {

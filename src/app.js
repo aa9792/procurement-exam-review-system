@@ -68,12 +68,14 @@ const SUBJECTS = (DATA.subjects || []).filter((subject) =>
 );
 const GROUPS = [...new Set(SUBJECTS.map((subject) => subject.group))];
 const EXPLANATION_ENGINE = window.ProcurementExplanations?.createExplanationEngine(QUESTIONS);
+const SIMILARITY_ENGINE = window.ProcurementSimilarity;
 const QUESTIONS_BY_ID = new Map(QUESTIONS.map((question) => [question.id, question]));
 
 let progress = migrateProgressToCurrentBank(loadProgress());
 let session = [];
 let sessionIndex = 0;
 let sessionAnswers = {};
+let sessionTopic = "";
 let firebaseAuth = null;
 let firebaseDb = null;
 let currentUser = null;
@@ -1137,11 +1139,40 @@ function weightedReview(pool, count) {
   return [...picked, ...remaining].slice(0, count);
 }
 
-function pickQuestions() {
+function similarityReferenceKeys(question) {
+  return lawReferences(question)
+    .map((reference) => reference.key)
+    .filter((key) => key && key !== "no-exact-reference");
+}
+
+function similarityTopicLabel(question) {
+  const reference = lawReferences(question).find((item) => item.key !== "no-exact-reference");
+  return reference?.label || question.subject;
+}
+
+function similarQuestionSet(anchor, pool, count = 20) {
+  if (!anchor) return [];
+  if (!SIMILARITY_ENGINE?.rankSimilarQuestions) {
+    return [anchor, ...prioritized(pool.filter((question) => question.id !== anchor.id))].slice(0, count);
+  }
+  return SIMILARITY_ENGINE.rankSimilarQuestions(anchor, pool, {
+    count,
+    getReferenceKeys: similarityReferenceKeys,
+  });
+}
+
+function pickQuestions(overrides = {}) {
   const mode = $("#modeSelect").value;
   const count = 20;
   let pool = filteredQuestions();
 
+  if (mode === "similar") {
+    const anchor = overrides.similarTo || prioritized(pool)[0];
+    sessionTopic = anchor ? similarityTopicLabel(anchor) : "";
+    return similarQuestionSet(anchor, pool, count);
+  }
+
+  sessionTopic = "";
   if (mode === "wrong") {
     pool = prioritized(pool.filter(isWrongQuestion));
   } else if (mode === "unseen") {
@@ -1159,7 +1190,7 @@ function pickQuestions() {
 
 function startQuiz(overrides = {}) {
   if (overrides.mode) $("#modeSelect").value = overrides.mode;
-  session = pickQuestions();
+  session = pickQuestions(overrides);
   sessionIndex = 0;
   sessionAnswers = {};
   $("#quizIntro").classList.add("hidden");
@@ -1258,6 +1289,13 @@ function renderQuiz() {
         ];
 
   area.innerHTML = `
+    ${
+      sessionTopic
+        ? `<div class="similar-session-banner"><strong>同類題組</strong><span>${escapeHTML(
+            sessionTopic
+          )}，相近考點連續練習</span></div>`
+        : ""
+    }
     <div class="quiz-top">
       <div>
         <strong>題目 ${sessionIndex + 1} / ${session.length}</strong>
@@ -1300,10 +1338,15 @@ function renderQuiz() {
       標準答案：${escapeHTML(answerLabel(question))}<br>
       ${!result.correct ? wrongMemoryHTML(question) : ""}
       ${!result.correct ? wrongReasonHTML(question) : ""}
-      ${explanationHTML(question, result.correct)}`;
+      ${explanationHTML(question, result.correct)}
+      <div class="similar-practice-action">
+        <button id="similarBtn" type="button">練這題的同類題</button>
+        <span>${escapeHTML(similarityTopicLabel(question))}</span>
+      </div>`;
     $$('[data-wrong-reason]').forEach((button) => {
       button.addEventListener("click", () => setWrongReason(question.id, button.dataset.wrongReason));
     });
+    $("#similarBtn")?.addEventListener("click", () => startQuiz({ mode: "similar", similarTo: question }));
   }
 
   $("#prevBtn").disabled = sessionIndex === 0;
