@@ -69,6 +69,7 @@ const SUBJECTS = (DATA.subjects || []).filter((subject) =>
 const GROUPS = [...new Set(SUBJECTS.map((subject) => subject.group))];
 const EXPLANATION_ENGINE = window.ProcurementExplanations?.createExplanationEngine(QUESTIONS);
 const SIMILARITY_ENGINE = window.ProcurementSimilarity;
+const EXAM_STRATEGY = window.ProcurementExamStrategy;
 const QUESTIONS_BY_ID = new Map(QUESTIONS.map((question) => [question.id, question]));
 
 let progress = migrateProgressToCurrentBank(loadProgress());
@@ -1036,6 +1037,99 @@ function lawBasisHTML(question, explanation) {
     </div>`;
 }
 
+function optionLawReferences(question, option) {
+  const synthetic = {
+    ...question,
+    type: "tf",
+    answer: "O",
+    stem: option,
+    raw: option,
+    options: [],
+    lawSource: "",
+  };
+  return lawReferences(synthetic);
+}
+
+function optionSourceMap(question) {
+  if (question.type !== "choice") return [];
+  return question.options.map((option, index) => ({
+    option: index + 1,
+    references: optionLawReferences(question, option),
+  }));
+}
+
+function emphasizedTrapText(text, tokens = []) {
+  let html = escapeHTML(text);
+  [...new Set(tokens.filter(Boolean))]
+    .sort((left, right) => right.length - left.length)
+    .slice(0, 3)
+    .forEach((token) => {
+      const escaped = escapeHTML(token);
+      html = html.replaceAll(escaped, `<strong class="trap-word">${escaped}</strong>`);
+    });
+  return html;
+}
+
+function examStrategyHTML(question, explanation) {
+  if (!EXAM_STRATEGY?.build) return "";
+  const references = lawReferences(question);
+  const options = optionSourceMap(question);
+  const strategy = EXAM_STRATEGY.build(question, explanation, references, options);
+  const crossLawOptionSources = strategy.order.crossLaw
+    ? `<div class="option-source-list">
+        ${options
+          .map((item) => {
+            const labels = item.references.map((reference) => EXAM_STRATEGY.locationLabel(reference));
+            return `<p><strong>選項（${item.option}）：</strong>${escapeHTML(labels.join(" / "))}</p>`;
+          })
+          .join("")}
+      </div>`
+    : "";
+  return `
+    <section class="exam-strategy" aria-label="法典檢索與破題強化">
+      <h4>法典檢索與破題強化</h4>
+      <div class="strategy-field">
+        <strong>1. 法典空間定位</strong>
+        <div class="strategy-locations">
+          ${strategy.locations
+            .map(
+              ({ reference, label }) =>
+                reference.url
+                  ? `<a href="${escapeHTML(reference.url)}" target="_blank" rel="noopener">${escapeHTML(label)}</a>`
+                  : `<span>${escapeHTML(label)}</span>`
+            )
+            .join("")}
+        </div>
+        ${crossLawOptionSources}
+      </div>
+      <div class="strategy-field">
+        <strong>2. 15 秒查閱關鍵字</strong>
+        <div class="strategy-keywords">${strategy.keywords
+          .map((keyword) => `<span>${escapeHTML(keyword)}</span>`)
+          .join("")}</div>
+        <p>${escapeHTML(strategy.lookup)}</p>
+      </div>
+      <div class="strategy-field">
+        <strong>3. 法條文字陷阱拆解</strong>
+        <div class="trap-list">
+          ${strategy.traps
+            .map(
+              (trap) => `<div class="trap-item">
+                <b>${escapeHTML(trap.label)}</b>
+                <p>${emphasizedTrapText(trap.text, trap.emphasis)}</p>
+                <p class="muted">${escapeHTML(trap.note)}</p>
+              </div>`
+            )
+            .join("")}
+        </div>
+      </div>
+      <div class="strategy-field">
+        <strong>4. 考場破題順序</strong>
+        <p>${escapeHTML(strategy.order.text)}</p>
+      </div>
+    </section>`;
+}
+
 function explanationHTML(question, showMemoryRule = true) {
   const explanation = EXPLANATION_ENGINE?.explain(question);
   const correctStatement =
@@ -1063,6 +1157,7 @@ function explanationHTML(question, showMemoryRule = true) {
           <p class="answer-reason"><strong>為什麼：</strong>${escapeHTML(reason)}</p>
         </div>
         ${lawBasisHTML(question, explanation)}
+        ${examStrategyHTML(question, explanation)}
         <span class="source-path">來源：${escapeHTML(question.source)}</span>
       </div>
     </details>`;
