@@ -1,5 +1,6 @@
 const DATA = window.EXAM_DATA || { questions: [], subjects: [], exam: {}, generatedAt: "" };
 const COMPENDIUM = window.COMPENDIUM_DATA || { meta: {}, pages: [] };
+const BOOK_READER = window.ProcurementCompendiumReader;
 const STORAGE_KEY = "procurement-review-progress-v2";
 const BANK_VERSION = DATA.bankVersion || DATA.generatedAt || "unknown";
 const SITE_URL = "https://aa9792.github.io/procurement-exam-review-system/";
@@ -77,6 +78,8 @@ let session = [];
 let sessionIndex = 0;
 let sessionAnswers = {};
 let sessionTopic = "";
+let bookPageIndex = 0;
+let bookSearchTimer = null;
 let firebaseAuth = null;
 let firebaseDb = null;
 let currentUser = null;
@@ -1791,6 +1794,108 @@ function renderLawSearch() {
     : `<div class="empty-state compact"><p>找不到符合「${escapeHTML(keyword)}」的法條。</p></div>`;
 }
 
+function bookTokenHTML(segment) {
+  const className = segment.type === "plain" ? "" : ` book-token book-token-${segment.type}`;
+  return className
+    ? `<span class="${className.trim()}">${escapeHTML(segment.text)}</span>`
+    : escapeHTML(segment.text);
+}
+
+function currentBookPage() {
+  return LAW_PAGE_INDEX[bookPageIndex] || null;
+}
+
+function renderBookToc() {
+  const list = $("#bookTocList");
+  const page = currentBookPage();
+  if (!list || !BOOK_READER || !page) return;
+  const currentSection = BOOK_READER.sectionForPage(page.page);
+  list.innerHTML = BOOK_READER.BOOK_SECTIONS.map((section, index) => {
+    const nextSection = BOOK_READER.BOOK_SECTIONS[index + 1];
+    const chapters = BOOK_READER.BOOK_CHAPTERS.filter((chapter) =>
+      chapter.page >= section.page && (!nextSection || chapter.page < nextSection.page)
+    );
+    const isActive = section.page === currentSection.page;
+    return `
+      <details class="book-toc-group"${isActive ? " open" : ""}>
+        <summary>${escapeHTML(section.title)}</summary>
+        <div class="book-toc-chapters">
+          ${chapters.map((chapter) => `
+            <button
+              class="book-toc-link${chapter.page === page.page ? " is-active" : ""}"
+              type="button"
+              data-book-page="${chapter.page}"
+            ><span>${escapeHTML(chapter.title)}</span><small>${chapter.page}</small></button>
+          `).join("")}
+        </div>
+      </details>`;
+  }).join("");
+}
+
+function renderBookPage() {
+  const page = currentBookPage();
+  if (!BOOK_READER || !page) return;
+  const section = BOOK_READER.sectionForPage(page.page);
+  const text = BOOK_READER.cleanPageText(page.text);
+  $("#bookSectionName").textContent = section.title;
+  $("#bookPageTitle").textContent = page.title || `電子書第 ${page.page} 頁`;
+  $("#bookElectronicPage").textContent = `電子書第 ${page.page} 頁`;
+  $("#bookPrintedPage").textContent = `原書頁碼 ${BOOK_READER.formatPrintedPages(page.text)}`;
+  $("#bookPageText").innerHTML = BOOK_READER.annotateText(text).map(bookTokenHTML).join("");
+  $("#bookPageStatus").textContent = `${page.page} / ${COMPENDIUM.meta.pageCount || LAW_PAGE_INDEX.length}`;
+  if ($("#bookPageInput")) $("#bookPageInput").value = page.page;
+  $("#bookPrevBtn").disabled = bookPageIndex <= 0;
+  $("#bookNextBtn").disabled = bookPageIndex >= LAW_PAGE_INDEX.length - 1;
+  renderBookToc();
+}
+
+function goToBookPage(pageNumber, shouldScroll = true) {
+  const requested = Number(pageNumber);
+  const nextIndex = LAW_PAGE_INDEX.findIndex((page) => page.page === requested);
+  if (nextIndex < 0) return false;
+  bookPageIndex = nextIndex;
+  renderBookPage();
+  if (shouldScroll) {
+    $(".book-reader")?.scrollIntoView({ block: "start", behavior: "auto" });
+  }
+  return true;
+}
+
+function renderBookSearch() {
+  const input = $("#bookSearchInput");
+  const results = $("#bookSearchResults");
+  if (!input || !results || !BOOK_READER) return;
+  const query = input.value.trim();
+  if (!query) {
+    results.classList.add("hidden");
+    results.innerHTML = "";
+    return;
+  }
+  const matches = BOOK_READER.searchPages(LAW_PAGE_INDEX, query, 40);
+  results.classList.remove("hidden");
+  results.innerHTML = matches.length
+    ? `<div class="book-search-summary">找到 ${matches.length} 個相關頁面，點選後直接翻到原書位置。</div>${matches.map(({ page, snippet }) => `
+        <button class="book-search-result" type="button" data-book-page="${page.page}">
+          <strong>電子書第 ${page.page} 頁｜${escapeHTML(BOOK_READER.formatPrintedPages(page.text))}</strong>
+          <span>${escapeHTML(page.title || "政府採購法令彙編")}</span>
+          <small>${escapeHTML(snippet)}${snippet.length >= 150 ? "…" : ""}</small>
+        </button>`).join("")}`
+    : `<div class="book-search-summary">找不到符合「${escapeHTML(query)}」的頁面。</div>`;
+}
+
+function initializeBookReader() {
+  const edition = $("#bookEdition");
+  if (!edition) return;
+  if (!BOOK_READER || !LAW_PAGE_INDEX.length) {
+    edition.textContent = "目前無法讀取彙編資料，請重新整理頁面。";
+    return;
+  }
+  const firstPage = LAW_PAGE_INDEX[0]?.page || 1;
+  edition.textContent = `${COMPENDIUM.meta.title || "政府採購法令彙編"}｜資料版本 ${COMPENDIUM.meta.sourceDate || ""}｜可翻閱電子書第 ${firstPage}–${COMPENDIUM.meta.pageCount || LAW_PAGE_INDEX.length} 頁`;
+  bookPageIndex = 0;
+  renderBookPage();
+}
+
 function setLawSearch(keyword) {
   const input = $("#lawSearchInput");
   if (!input) return;
@@ -1852,6 +1957,43 @@ function bindEvents() {
     lawSearchTimer = setTimeout(renderLawSearch, 140);
   });
   $("#clearLawSearchBtn")?.addEventListener("click", () => setLawSearch(""));
+  $("#bookSearchInput")?.addEventListener("input", () => {
+    clearTimeout(bookSearchTimer);
+    bookSearchTimer = setTimeout(renderBookSearch, 120);
+  });
+  $("#bookSearchResults")?.addEventListener("click", (event) => {
+    const target = event.target.closest("[data-book-page]");
+    if (target && goToBookPage(target.dataset.bookPage)) {
+      $("#bookSearchResults").classList.add("hidden");
+    }
+  });
+  $("#bookTocList")?.addEventListener("click", (event) => {
+    const target = event.target.closest("[data-book-page]");
+    if (target) goToBookPage(target.dataset.bookPage);
+  });
+  $("#bookPrevBtn")?.addEventListener("click", () => {
+    if (bookPageIndex > 0) {
+      bookPageIndex -= 1;
+      renderBookPage();
+      $(".book-reader")?.scrollIntoView({ block: "start", behavior: "auto" });
+    }
+  });
+  $("#bookNextBtn")?.addEventListener("click", () => {
+    if (bookPageIndex < LAW_PAGE_INDEX.length - 1) {
+      bookPageIndex += 1;
+      renderBookPage();
+      $(".book-reader")?.scrollIntoView({ block: "start", behavior: "auto" });
+    }
+  });
+  $("#bookPageGoBtn")?.addEventListener("click", () => {
+    const input = $("#bookPageInput");
+    if (input && !goToBookPage(input.value)) {
+      alert(`可翻閱頁碼為 ${LAW_PAGE_INDEX[0]?.page || 1}–${LAW_PAGE_INDEX.at(-1)?.page || COMPENDIUM.meta.pageCount}。`);
+    }
+  });
+  $("#bookPageInput")?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") $("#bookPageGoBtn")?.click();
+  });
   $$('.page-tabs a[href="#progress"], .page-tabs a[href="#wrong-review"]').forEach((link) => {
     link.addEventListener("click", () => {
       const target = document.querySelector(link.getAttribute("href"));
@@ -1889,6 +2031,7 @@ setupSelectors();
 bindEvents();
 renderAll();
 renderLawSearch();
+initializeBookReader();
 initFirebaseSync();
 updateAuthControls();
 updateBrowserHelp();
