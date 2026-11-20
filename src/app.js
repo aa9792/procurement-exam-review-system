@@ -1,6 +1,7 @@
 const DATA = window.EXAM_DATA || { questions: [], subjects: [], exam: {}, generatedAt: "" };
 const COMPENDIUM = window.COMPENDIUM_DATA || { meta: {}, pages: [] };
 const BOOK_READER = window.ProcurementCompendiumReader;
+const MOCK_EXAM = window.ProcurementMockExam;
 const STORAGE_KEY = "procurement-review-progress-v2";
 const BANK_VERSION = DATA.bankVersion || DATA.generatedAt || "unknown";
 const SITE_URL = "https://aa9792.github.io/procurement-exam-review-system/";
@@ -80,6 +81,8 @@ let sessionAnswers = {};
 let sessionTopic = "";
 let bookPageIndex = 0;
 let bookSearchTimer = null;
+let mockSession = null;
+const mockFormCounters = {};
 let firebaseAuth = null;
 let firebaseDb = null;
 let currentUser = null;
@@ -1480,6 +1483,263 @@ function renderSessionResult() {
   $("#reviewWrongSessionBtn").addEventListener("click", () => startQuiz({ mode: "wrong" }));
 }
 
+function mockSubjectTitle(subjectId) {
+  return SUBJECTS.find((subject) => subject.id === subjectId)?.title || subjectId;
+}
+
+function mockBlueprintTable(paper) {
+  return `
+    <table class="mock-blueprint-table">
+      <thead><tr><th>科目</th><th>是非</th><th>選擇</th></tr></thead>
+      <tbody>
+        ${paper.blueprint.map((item) => `
+          <tr>
+            <td>${escapeHTML(mockSubjectTitle(item.subjectId))}</td>
+            <td>${item.tf}</td>
+            <td>${item.choice}</td>
+          </tr>`).join("")}
+      </tbody>
+    </table>`;
+}
+
+function renderMockPicker() {
+  const picker = $("#mockPaperPicker");
+  const area = $("#mockExamArea");
+  if (!picker || !area) return;
+  area.classList.add("hidden");
+  picker.classList.remove("hidden");
+  if (!MOCK_EXAM?.PAPERS) {
+    picker.innerHTML = `<div class="empty-state compact"><p>模擬卷載入失敗，請重新整理頁面。</p></div>`;
+    return;
+  }
+  picker.innerHTML = MOCK_EXAM.PAPERS.map((paper) => `
+    <article class="mock-paper-card">
+      <div class="mock-paper-title">
+        <div>
+          <h3>${escapeHTML(paper.title)}</h3>
+          <p>${paper.total} 題・${paper.points} 分・建議 ${paper.duration} 分鐘</p>
+        </div>
+        <span>${paper.tf} 是非 / ${paper.choice} 選擇</span>
+      </div>
+      ${mockBlueprintTable(paper)}
+      <button class="primary full" type="button" data-start-mock="${paper.id}">開始第 ${
+        (mockFormCounters[paper.id] || 0) + 1
+      } 份模擬卷</button>
+    </article>`).join("");
+  $$('[data-start-mock]').forEach((button) => {
+    button.addEventListener("click", () => startMockExam(button.dataset.startMock));
+  });
+}
+
+function startMockExam(paperId) {
+  if (!MOCK_EXAM) return;
+  const variant = (mockFormCounters[paperId] || 0) + 1;
+  const priorityIds = new Set(QUESTIONS.filter(isWrongQuestion).map((question) => question.id));
+  try {
+    const questions = MOCK_EXAM.buildPaper(QUESTIONS, paperId, variant, priorityIds);
+    const validation = MOCK_EXAM.validatePaper(questions, paperId);
+    if (!validation.valid) throw new Error(validation.errors.join("\n"));
+    mockFormCounters[paperId] = variant;
+    mockSession = {
+      paperId,
+      variant,
+      questions,
+      answers: {},
+      index: 0,
+      submitted: false,
+      recorded: false,
+    };
+    $("#mockPaperPicker").classList.add("hidden");
+    $("#mockExamArea").classList.remove("hidden");
+    renderMockExam();
+    $("#mock-exam")?.scrollIntoView({ block: "start", behavior: "auto" });
+  } catch (error) {
+    alert(`無法建立模擬卷：${error.message}`);
+  }
+}
+
+function mockChoices(question) {
+  return question.type === "choice"
+    ? question.options.map((option, index) => ({ value: String(index + 1), label: `(${index + 1}) ${option}` }))
+    : [
+        { value: "O", label: "O（正確）" },
+        { value: "X", label: "X（錯誤）" },
+      ];
+}
+
+function recordMockProgress() {
+  if (!mockSession || mockSession.recorded) return;
+  mockSession.questions.forEach((question) => {
+    const answer = mockSession.answers[question.id];
+    if (!answer) return;
+    const correct = answer === question.answer;
+    const item = normalizeProgressItem(progress[question.id]);
+    item.attempts += 1;
+    item.lastAnswer = answer;
+    item.lastAt = new Date().toISOString();
+    item.fingerprint = question.fingerprint || "";
+    item.bankVersion = BANK_VERSION;
+    if (correct) {
+      item.correct += 1;
+      item.lastCorrectDate = localDateKey();
+      item.mastered = true;
+      item.streak = 1;
+      item.dueAt = "";
+    } else {
+      item.wrong += 1;
+      item.mastered = false;
+      item.streak = 0;
+      item.dueAt = "";
+      item.wrongReason = "模擬卷答錯";
+    }
+    progress[question.id] = item;
+  });
+  mockSession.recorded = true;
+  saveProgress();
+  renderAll(false);
+}
+
+function submitMockExam() {
+  if (!mockSession) return;
+  const unanswered = mockSession.questions.filter((question) => !mockSession.answers[question.id]);
+  if (unanswered.length) return;
+  mockSession.submitted = true;
+  recordMockProgress();
+  renderMockExam();
+  $("#mock-exam")?.scrollIntoView({ block: "start", behavior: "auto" });
+}
+
+function mockScoreSummary(paper) {
+  const score = MOCK_EXAM.scorePaper(mockSession.questions, mockSession.answers);
+  const rate = Math.round((score.correctPoints / score.totalPoints) * 100);
+  return `
+    <section class="mock-score-summary">
+      <div class="mock-score-main">
+        <span>本卷得分</span>
+        <strong>${score.correctPoints} / ${score.totalPoints}</strong>
+        <small>答對 ${score.correct} / ${mockSession.questions.length} 題・得分率 ${rate}%</small>
+      </div>
+      <div class="mock-subject-scores">
+        ${paper.blueprint.map((item) => {
+          const subject = score.bySubject[item.subjectId];
+          return `<div><span>${escapeHTML(mockSubjectTitle(item.subjectId))}</span><strong>${subject.earned} / ${subject.points}</strong></div>`;
+        }).join("")}
+      </div>
+    </section>`;
+}
+
+function leaveMockExam() {
+  if (mockSession && !mockSession.submitted && Object.keys(mockSession.answers).length) {
+    if (!confirm("尚未交卷，返回選卷會清除這次作答。確定返回嗎？")) return;
+  }
+  mockSession = null;
+  renderMockPicker();
+  $("#mock-exam")?.scrollIntoView({ block: "start", behavior: "auto" });
+}
+
+function renderMockExam() {
+  const area = $("#mockExamArea");
+  if (!area || !mockSession || !MOCK_EXAM) return;
+  const paper = MOCK_EXAM.paperById(mockSession.paperId);
+  const question = mockSession.questions[mockSession.index];
+  const selected = mockSession.answers[question.id] || "";
+  const answered = Object.keys(mockSession.answers).length;
+  const remaining = mockSession.questions.length - answered;
+  const correct = mockSession.submitted && selected === question.answer;
+  const choices = mockChoices(question);
+
+  area.innerHTML = `
+    <header class="mock-session-header">
+      <div>
+        <span>${escapeHTML(paper.title)}・第 ${mockSession.variant} 份</span>
+        <h3>題目 ${mockSession.index + 1} / ${mockSession.questions.length}</h3>
+      </div>
+      <div class="mock-session-status">
+        <strong>${mockSession.submitted ? "已交卷" : `已答 ${answered} 題`}</strong>
+        <span>${paper.points} 分・建議 ${paper.duration} 分鐘</span>
+      </div>
+    </header>
+    ${mockSession.submitted ? mockScoreSummary(paper) : `
+      <div class="mock-progress" aria-label="模擬卷作答進度">
+        <span style="width:${Math.round((answered / mockSession.questions.length) * 100)}%"></span>
+      </div>`}
+    <div class="mock-toolbar">
+      <button id="mockBackToPickerBtn" type="button">返回選卷</button>
+      ${!mockSession.submitted && remaining ? `<button id="mockNextUnansweredBtn" type="button">找下一題未答</button>` : ""}
+      ${mockSession.submitted ? `<button id="mockNewFormBtn" type="button">換一份新卷</button>` : ""}
+    </div>
+    <div class="mock-navigator" aria-label="題號導覽">
+      ${mockSession.questions.map((item, index) => {
+        const answer = mockSession.answers[item.id];
+        const resultClass = mockSession.submitted
+          ? answer === item.answer ? " is-correct" : " is-wrong"
+          : answer ? " is-answered" : "";
+        return `<button class="mock-number${index === mockSession.index ? " is-current" : ""}${resultClass}" type="button" data-mock-index="${index}">${index + 1}</button>`;
+      }).join("")}
+    </div>
+    <article class="mock-question">
+      <div class="question-meta">
+        <span class="mini-tag">${escapeHTML(question.subject)}</span>
+        <span class="mini-tag">${questionTypeLabel(question.type)}</span>
+        <span class="mini-tag">${question.type === "choice" ? "2 分" : "1 分"}</span>
+      </div>
+      <p class="question-stem">${annotatedText(questionText(question))}</p>
+      <div class="options ${question.type === "tf" ? "tf-options" : ""}">
+        ${choices.map((choice) => {
+          let className = selected === choice.value ? " is-selected" : "";
+          if (mockSession.submitted && choice.value === question.answer) className += " is-correct";
+          if (mockSession.submitted && selected === choice.value && !correct) className += " is-wrong";
+          return `<button class="option${className}" type="button" data-mock-answer="${choice.value}"${mockSession.submitted ? " disabled" : ""}>${annotatedText(choice.label)}</button>`;
+        }).join("")}
+      </div>
+      ${mockSession.submitted ? `
+        <div class="answer-box ${correct ? "is-correct" : "is-wrong"}">
+          <strong>${correct ? "答對。" : "答錯。"}</strong><br>
+          你的答案：${escapeHTML(answerLabel(question, selected))}<br>
+          標準答案：${escapeHTML(answerLabel(question))}
+          ${!correct ? wrongMemoryHTML(question) : ""}
+          ${explanationHTML(question, correct)}
+        </div>` : `<p class="mock-answer-lock">交卷前不顯示答案，可隨時返回修改。</p>`}
+    </article>
+    <footer class="mock-footer">
+      <button id="mockPrevBtn" type="button"${mockSession.index === 0 ? " disabled" : ""}>上一題</button>
+      <button id="mockNextBtn" type="button"${mockSession.index === mockSession.questions.length - 1 ? " disabled" : ""}>下一題</button>
+      ${!mockSession.submitted ? `<button id="mockSubmitBtn" class="primary" type="button"${remaining ? " disabled" : ""}>${remaining ? `尚有 ${remaining} 題未答` : "完成作答並交卷"}</button>` : ""}
+    </footer>`;
+
+  $$('[data-mock-answer]').forEach((button) => {
+    button.addEventListener("click", () => {
+      mockSession.answers[question.id] = button.dataset.mockAnswer;
+      renderMockExam();
+    });
+  });
+  $$('[data-mock-index]').forEach((button) => {
+    button.addEventListener("click", () => {
+      mockSession.index = Number(button.dataset.mockIndex);
+      renderMockExam();
+      $(".mock-question")?.scrollIntoView({ block: "start", behavior: "auto" });
+    });
+  });
+  $("#mockPrevBtn")?.addEventListener("click", () => {
+    mockSession.index -= 1;
+    renderMockExam();
+  });
+  $("#mockNextBtn")?.addEventListener("click", () => {
+    mockSession.index += 1;
+    renderMockExam();
+  });
+  $("#mockNextUnansweredBtn")?.addEventListener("click", () => {
+    const nextIndex = mockSession.questions.findIndex((item) => !mockSession.answers[item.id]);
+    if (nextIndex >= 0) {
+      mockSession.index = nextIndex;
+      renderMockExam();
+    }
+  });
+  $("#mockSubmitBtn")?.addEventListener("click", submitMockExam);
+  $("#mockBackToPickerBtn")?.addEventListener("click", leaveMockExam);
+  $("#mockNewFormBtn")?.addEventListener("click", () => startMockExam(mockSession.paperId));
+}
+
 function renderStats() {
   const attempted = QUESTIONS.filter((question) => statsFor(question.id).attempts > 0).length;
   const wrong = QUESTIONS.filter(isWrongQuestion).length;
@@ -2032,6 +2292,7 @@ bindEvents();
 renderAll();
 renderLawSearch();
 initializeBookReader();
+renderMockPicker();
 initFirebaseSync();
 updateAuthControls();
 updateBrowserHelp();
