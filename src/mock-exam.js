@@ -83,7 +83,7 @@
     return hash >>> 0;
   }
 
-  function likelihoodScore(question, priorityIds = new Set()) {
+  function likelihoodScore(question, priorityIds = new Set(), recentIds = new Set()) {
     const text = questionText(question);
     let score = 0;
     score += HIGH_YIELD_PATTERNS.reduce((sum, pattern) => sum + (pattern.test(text) ? 4 : 0), 0);
@@ -93,39 +93,93 @@
     if (/第\s*[零〇一二三四五六七八九十百千\d]+\s*條/.test(text) || question.lawSource) score += 5;
     if (text.length >= 30 && text.length <= 520) score += 2;
     if (priorityIds.has(question.id)) score += 10;
+    if (recentIds.has(question.id)) score -= 16;
     return score;
   }
 
-  function rankedPool(questions, subjectId, type, variant, priorityIds) {
+  function normalizedStem(question) {
+    return String(question.stem || question.raw || "")
+      .replace(/[\s，。；：、（）()「」『』【】！？,.!?：;\-_/]/g, "")
+      .replace(/[零〇一二三四五六七八九十百千萬億\d]+/g, "#")
+      .toLowerCase();
+  }
+
+  function grams(value) {
+    const text = normalizedStem({ stem: value });
+    const result = new Set();
+    for (let index = 0; index < text.length - 1; index += 1) result.add(text.slice(index, index + 2));
+    return result;
+  }
+
+  function questionSimilarity(left, right) {
+    const leftText = normalizedStem(left);
+    const rightText = normalizedStem(right);
+    if (!leftText || !rightText) return 0;
+    if (leftText === rightText) return 1;
+    const leftGrams = grams(leftText);
+    const rightGrams = grams(rightText);
+    if (!leftGrams.size || !rightGrams.size) return 0;
+    let shared = 0;
+    leftGrams.forEach((item) => {
+      if (rightGrams.has(item)) shared += 1;
+    });
+    return shared / Math.min(leftGrams.size, rightGrams.size);
+  }
+
+  function articleTopic(question) {
+    const text = questionText(question);
+    const named = text.match(/(?:政府採購法|採購法|施行細則)?\s*第\s*([零〇一二三四五六七八九十百千\d]+)\s*條(?:\s*之\s*([零〇一二三四五六七八九十\d]+))?/);
+    return named ? `${named[1]}${named[2] ? `之${named[2]}` : ""}` : "";
+  }
+
+  function rankedPool(questions, subjectId, type, seed, priorityIds, recentIds) {
     return questions
       .filter((question) => question.subjectId === subjectId && question.type === type)
       .map((question) => ({
         question,
-        score: likelihoodScore(question, priorityIds),
-        tie: stableHash(`${question.id}|${variant}`),
+        score: likelihoodScore(question, priorityIds, recentIds),
+        jitter: stableHash(`${question.id}|${seed}`) % 601,
       }))
-      .sort((left, right) => right.score - left.score || left.tie - right.tie);
+      .sort((left, right) => (right.score * 100 + right.jitter) - (left.score * 100 + left.jitter));
   }
 
-  function chooseFromPool(pool, count, variant) {
+  function chooseFromPool(pool, count, alreadyPicked = []) {
     if (pool.length < count) throw new Error(`題庫不足：需要 ${count} 題，目前只有 ${pool.length} 題。`);
-    const windowSize = Math.min(pool.length, Math.max(count, count * 3));
-    const candidates = pool.slice(0, windowSize);
-    const offset = ((Math.max(1, variant) - 1) * count) % windowSize;
     const picked = [];
-    for (let index = 0; picked.length < count; index += 1) {
-      picked.push(candidates[(offset + index) % windowSize].question);
+    const deferred = [];
+    const topicCounts = new Map();
+    pool.forEach(({ question }) => {
+      if (picked.length >= count) return;
+      const topic = articleTopic(question);
+      const isNearDuplicate = [...alreadyPicked, ...picked].some((selected) => questionSimilarity(selected, question) >= 0.72);
+      const repeatsTopic = topic && (topicCounts.get(topic) || 0) >= 2;
+      if (isNearDuplicate || repeatsTopic) {
+        deferred.push(question);
+        return;
+      }
+      picked.push(question);
+      if (topic) topicCounts.set(topic, (topicCounts.get(topic) || 0) + 1);
+    });
+    for (const question of deferred) {
+      if (picked.length >= count) break;
+      picked.push(question);
+    }
+    if (picked.length < count) {
+      for (const { question } of pool) {
+        if (picked.length >= count) break;
+        if (!picked.some((item) => item.id === question.id)) picked.push(question);
+      }
     }
     return picked;
   }
 
-  function buildPaper(questions, paperId, variant = 1, priorityIds = new Set()) {
+  function buildPaper(questions, paperId, seed = "default", priorityIds = new Set(), recentIds = new Set()) {
     const paper = paperById(paperId);
     if (!paper) throw new Error(`未知模擬卷：${paperId}`);
     const selected = [];
     paper.blueprint.forEach((item) => {
-      selected.push(...chooseFromPool(rankedPool(questions, item.subjectId, "tf", variant, priorityIds), item.tf, variant));
-      selected.push(...chooseFromPool(rankedPool(questions, item.subjectId, "choice", variant, priorityIds), item.choice, variant));
+      selected.push(...chooseFromPool(rankedPool(questions, item.subjectId, "tf", seed, priorityIds, recentIds), item.tf, selected));
+      selected.push(...chooseFromPool(rankedPool(questions, item.subjectId, "choice", seed, priorityIds, recentIds), item.choice, selected));
     });
     return selected;
   }
@@ -162,5 +216,5 @@
     }, { totalPoints: 0, correctPoints: 0, correct: 0, bySubject: {} });
   }
 
-  return { PAPERS, buildPaper, likelihoodScore, paperById, scorePaper, validatePaper };
+  return { PAPERS, buildPaper, likelihoodScore, paperById, questionSimilarity, scorePaper, validatePaper };
 });

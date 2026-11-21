@@ -3,6 +3,9 @@ const COMPENDIUM = window.COMPENDIUM_DATA || { meta: {}, pages: [] };
 const BOOK_READER = window.ProcurementCompendiumReader;
 const MOCK_EXAM = window.ProcurementMockExam;
 const STORAGE_KEY = "procurement-review-progress-v2";
+const MOCK_DRAFT_KEY = "procurement-mock-draft-v1";
+const MOCK_HISTORY_KEY = "procurement-mock-history-v1";
+const MOCK_COUNTER_KEY = "procurement-mock-counter-v1";
 const BANK_VERSION = DATA.bankVersion || DATA.generatedAt || "unknown";
 const SITE_URL = "https://aa9792.github.io/procurement-exam-review-system/";
 const FIREBASE_CONFIG = {
@@ -82,7 +85,7 @@ let sessionTopic = "";
 let bookPageIndex = 0;
 let bookSearchTimer = null;
 let mockSession = null;
-const mockFormCounters = {};
+const mockFormCounters = loadJSONStorage(MOCK_COUNTER_KEY, {});
 let firebaseAuth = null;
 let firebaseDb = null;
 let currentUser = null;
@@ -98,6 +101,100 @@ function loadProgress() {
   } catch {
     return {};
   }
+}
+
+function loadJSONStorage(key, fallback) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) || "null");
+    return parsed && typeof parsed === "object" ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function randomMockSeed() {
+  const values = new Uint32Array(2);
+  if (window.crypto?.getRandomValues) window.crypto.getRandomValues(values);
+  else {
+    values[0] = Date.now() >>> 0;
+    values[1] = Math.floor(Math.random() * 0xffffffff);
+  }
+  return `${Date.now().toString(36)}-${values[0].toString(36)}-${values[1].toString(36)}`;
+}
+
+function loadMockDraft() {
+  return loadJSONStorage(MOCK_DRAFT_KEY, null);
+}
+
+function mockDraftSnapshot() {
+  if (!mockSession || mockSession.submitted) return null;
+  return {
+    paperId: mockSession.paperId,
+    variant: mockSession.variant,
+    seed: mockSession.seed,
+    questionIds: mockSession.questions.map((question) => question.id),
+    answers: { ...mockSession.answers },
+    index: mockSession.index,
+    createdAt: mockSession.createdAt,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function saveMockDraft() {
+  const draft = mockDraftSnapshot();
+  if (!draft) return;
+  mockSession.updatedAt = draft.updatedAt;
+  localStorage.setItem(MOCK_DRAFT_KEY, JSON.stringify(draft));
+  scheduleCloudSave();
+}
+
+function clearMockDraft() {
+  localStorage.removeItem(MOCK_DRAFT_KEY);
+  scheduleCloudSave();
+}
+
+function restoreMockDraft(rawDraft) {
+  if (!rawDraft || !MOCK_EXAM?.paperById(rawDraft.paperId) || !Array.isArray(rawDraft.questionIds)) return false;
+  const questions = rawDraft.questionIds.map((id) => QUESTIONS_BY_ID.get(id)).filter(Boolean);
+  const validation = MOCK_EXAM.validatePaper(questions, rawDraft.paperId);
+  if (!validation.valid || questions.length !== rawDraft.questionIds.length) return false;
+  const validIds = new Set(questions.map((question) => question.id));
+  const answers = Object.fromEntries(
+    Object.entries(rawDraft.answers || {}).filter(([id, answer]) => validIds.has(id) && ["O", "X", "1", "2", "3", "4", "5"].includes(String(answer))),
+  );
+  mockSession = {
+    paperId: rawDraft.paperId,
+    variant: Number(rawDraft.variant || 1),
+    seed: rawDraft.seed || randomMockSeed(),
+    questions,
+    answers,
+    index: Math.max(0, Math.min(Number(rawDraft.index || 0), questions.length - 1)),
+    submitted: false,
+    recorded: false,
+    createdAt: rawDraft.createdAt || rawDraft.updatedAt || new Date().toISOString(),
+    updatedAt: rawDraft.updatedAt || "",
+    restored: true,
+  };
+  mockFormCounters[mockSession.paperId] = Math.max(mockFormCounters[mockSession.paperId] || 0, mockSession.variant);
+  localStorage.setItem(MOCK_COUNTER_KEY, JSON.stringify(mockFormCounters));
+  return true;
+}
+
+function mockHistory() {
+  return loadJSONStorage(MOCK_HISTORY_KEY, {});
+}
+
+function recentMockQuestionIds(paperId) {
+  const forms = mockHistory()[paperId] || [];
+  return new Set(forms.slice(-3).flatMap((form) => form.questionIds || []));
+}
+
+function rememberMockForm(paperId, seed, questions) {
+  const history = mockHistory();
+  const forms = Array.isArray(history[paperId]) ? history[paperId] : [];
+  forms.push({ seed, questionIds: questions.map((question) => question.id), createdAt: new Date().toISOString() });
+  history[paperId] = forms.slice(-3);
+  localStorage.setItem(MOCK_HISTORY_KEY, JSON.stringify(history));
 }
 
 function saveProgress() {
@@ -321,8 +418,9 @@ async function pushProgressToCloud() {
     updateSyncStatus("同步中...");
     await firebaseDb.ref(userProgressPath()).set({
       progress,
+      mockDraft: loadMockDraft(),
       updatedAt: firebase.database.ServerValue.TIMESTAMP,
-      appVersion: "review-progress-v3",
+      appVersion: "review-progress-v4",
       bankVersion: BANK_VERSION,
     });
     updateSyncStatus(`已同步：${currentUser.displayName || currentUser.email || "Google 帳號"}`);
@@ -331,14 +429,14 @@ async function pushProgressToCloud() {
   }
 }
 
-async function readCloudProgress(user) {
+async function readCloudState(user) {
   const currentSnapshot = await firebaseDb.ref(userProgressPath(user.uid)).once("value");
   const currentValue = currentSnapshot.val();
-  if (currentValue?.progress) return currentValue.progress;
-  if (currentValue && !currentValue.progress) return currentValue;
+  if (currentValue?.progress) return { progress: currentValue.progress, mockDraft: currentValue.mockDraft || null };
+  if (currentValue && !currentValue.progress) return { progress: currentValue, mockDraft: null };
 
   const legacySnapshot = await firebaseDb.ref(`procurementExamUsers/${user.uid}/progress`).once("value");
-  return legacySnapshot.val() || {};
+  return { progress: legacySnapshot.val() || {}, mockDraft: null };
 }
 
 async function loadProgressFromCloud(user) {
@@ -346,13 +444,21 @@ async function loadProgressFromCloud(user) {
   isCloudLoading = true;
   try {
     updateSyncStatus("讀取雲端進度...");
-    const cloudProgress = await readCloudProgress(user);
-    progress = migrateProgressToCurrentBank(mergeProgress(progress, cloudProgress));
+    const cloudState = await readCloudState(user);
+    progress = migrateProgressToCurrentBank(mergeProgress(progress, cloudState.progress));
     localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+    const localDraft = loadMockDraft();
+    const cloudDraft = cloudState.mockDraft;
+    const newestDraft = String(cloudDraft?.updatedAt || "") > String(localDraft?.updatedAt || "") ? cloudDraft : localDraft;
+    if (newestDraft) {
+      localStorage.setItem(MOCK_DRAFT_KEY, JSON.stringify(newestDraft));
+      restoreMockDraft(newestDraft);
+    }
     cloudReady = true;
     isCloudLoading = false;
     renderAll();
     if (session.length) renderQuiz();
+    renderMockWorkspace();
     await pushProgressToCloud();
   } catch (error) {
     isCloudLoading = false;
@@ -1534,21 +1640,30 @@ function renderMockPicker() {
 function startMockExam(paperId) {
   if (!MOCK_EXAM) return;
   const variant = (mockFormCounters[paperId] || 0) + 1;
+  const seed = randomMockSeed();
   const priorityIds = new Set(QUESTIONS.filter(isWrongQuestion).map((question) => question.id));
+  const recentIds = recentMockQuestionIds(paperId);
   try {
-    const questions = MOCK_EXAM.buildPaper(QUESTIONS, paperId, variant, priorityIds);
+    const questions = MOCK_EXAM.buildPaper(QUESTIONS, paperId, seed, priorityIds, recentIds);
     const validation = MOCK_EXAM.validatePaper(questions, paperId);
     if (!validation.valid) throw new Error(validation.errors.join("\n"));
     mockFormCounters[paperId] = variant;
+    localStorage.setItem(MOCK_COUNTER_KEY, JSON.stringify(mockFormCounters));
     mockSession = {
       paperId,
       variant,
+      seed,
       questions,
       answers: {},
       index: 0,
       submitted: false,
       recorded: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: "",
+      restored: false,
     };
+    rememberMockForm(paperId, seed, questions);
+    saveMockDraft();
     $("#mockPaperPicker").classList.add("hidden");
     $("#mockExamArea").classList.remove("hidden");
     renderMockExam();
@@ -1604,6 +1719,7 @@ function submitMockExam() {
   const unanswered = mockSession.questions.filter((question) => !mockSession.answers[question.id]);
   if (unanswered.length) return;
   mockSession.submitted = true;
+  clearMockDraft();
   recordMockProgress();
   renderMockExam();
   $("#mock-exam")?.scrollIntoView({ block: "start", behavior: "auto" });
@@ -1632,6 +1748,7 @@ function leaveMockExam() {
   if (mockSession && !mockSession.submitted && Object.keys(mockSession.answers).length) {
     if (!confirm("尚未交卷，返回選卷會清除這次作答。確定返回嗎？")) return;
   }
+  clearMockDraft();
   mockSession = null;
   renderMockPicker();
   $("#mock-exam")?.scrollIntoView({ block: "start", behavior: "auto" });
@@ -1656,7 +1773,7 @@ function renderMockExam() {
       </div>
       <div class="mock-session-status">
         <strong>${mockSession.submitted ? "已交卷" : `已答 ${answered} 題`}</strong>
-        <span>${paper.points} 分・建議 ${paper.duration} 分鐘</span>
+        <span>${mockSession.submitted ? `${paper.points} 分・建議 ${paper.duration} 分鐘` : "草稿已自動保存，可離開後再繼續"}</span>
       </div>
     </header>
     ${mockSession.submitted ? mockScoreSummary(paper) : `
@@ -1710,34 +1827,49 @@ function renderMockExam() {
   $$('[data-mock-answer]').forEach((button) => {
     button.addEventListener("click", () => {
       mockSession.answers[question.id] = button.dataset.mockAnswer;
+      saveMockDraft();
       renderMockExam();
     });
   });
   $$('[data-mock-index]').forEach((button) => {
     button.addEventListener("click", () => {
       mockSession.index = Number(button.dataset.mockIndex);
+      saveMockDraft();
       renderMockExam();
       $(".mock-question")?.scrollIntoView({ block: "start", behavior: "auto" });
     });
   });
   $("#mockPrevBtn")?.addEventListener("click", () => {
     mockSession.index -= 1;
+    saveMockDraft();
     renderMockExam();
   });
   $("#mockNextBtn")?.addEventListener("click", () => {
     mockSession.index += 1;
+    saveMockDraft();
     renderMockExam();
   });
   $("#mockNextUnansweredBtn")?.addEventListener("click", () => {
     const nextIndex = mockSession.questions.findIndex((item) => !mockSession.answers[item.id]);
     if (nextIndex >= 0) {
       mockSession.index = nextIndex;
+      saveMockDraft();
       renderMockExam();
     }
   });
   $("#mockSubmitBtn")?.addEventListener("click", submitMockExam);
   $("#mockBackToPickerBtn")?.addEventListener("click", leaveMockExam);
   $("#mockNewFormBtn")?.addEventListener("click", () => startMockExam(mockSession.paperId));
+}
+
+function renderMockWorkspace() {
+  if (mockSession && !mockSession.submitted) {
+    $("#mockPaperPicker")?.classList.add("hidden");
+    $("#mockExamArea")?.classList.remove("hidden");
+    renderMockExam();
+    return;
+  }
+  renderMockPicker();
 }
 
 function renderStats() {
@@ -2280,10 +2412,16 @@ function bindEvents() {
   $("#clearBtn").addEventListener("click", () => {
     if (!confirm("確定要清除所有本機作答紀錄嗎？")) return;
     progress = {};
+    mockSession = null;
+    localStorage.removeItem(MOCK_DRAFT_KEY);
+    localStorage.removeItem(MOCK_HISTORY_KEY);
+    localStorage.removeItem(MOCK_COUNTER_KEY);
+    Object.keys(mockFormCounters).forEach((key) => delete mockFormCounters[key]);
     saveProgress();
     sessionAnswers = {};
     renderAll();
     renderQuiz();
+    renderMockPicker();
   });
 }
 
@@ -2292,7 +2430,8 @@ bindEvents();
 renderAll();
 renderLawSearch();
 initializeBookReader();
-renderMockPicker();
+restoreMockDraft(loadMockDraft());
+renderMockWorkspace();
 initFirebaseSync();
 updateAuthControls();
 updateBrowserHelp();

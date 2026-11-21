@@ -45,9 +45,26 @@ test("builds every paper with exact per-subject quotas", () => {
 
 test("different forms rotate within the high-yield candidate window", () => {
   const bank = syntheticBank();
-  const formA = mock.buildPaper(bank, "law", 1).map((question) => question.id);
-  const formB = mock.buildPaper(bank, "law", 2).map((question) => question.id);
+  const formA = mock.buildPaper(bank, "law", "seed-a").map((question) => question.id);
+  const formB = mock.buildPaper(bank, "law", "seed-b").map((question) => question.id);
   assert.notDeepEqual(formA, formB);
+});
+
+test("detects near-duplicate stems with changed numbers", () => {
+  const first = { stem: "機關應於公告後三十日內辦理驗收。" };
+  const second = { stem: "機關應於公告後二十日內辦理驗收。" };
+  const different = { stem: "評選委員會應如何組成？" };
+  assert.ok(mock.questionSimilarity(first, second) >= 0.72);
+  assert.ok(mock.questionSimilarity(first, different) < 0.72);
+});
+
+test("recent questions are deprioritized in the next paper", () => {
+  const bank = syntheticBank();
+  const formA = mock.buildPaper(bank, "other", "seed-a");
+  const recentIds = new Set(formA.map((question) => question.id));
+  const formB = mock.buildPaper(bank, "other", "seed-b", new Set(), recentIds);
+  const repeated = formB.filter((question) => recentIds.has(question.id));
+  assert.ok(repeated.length < formA.length / 2);
 });
 
 test("scores true-false as one point and choice as two points", () => {
