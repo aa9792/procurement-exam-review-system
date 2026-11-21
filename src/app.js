@@ -162,13 +162,15 @@ function restoreMockDraft(rawDraft) {
   const answers = Object.fromEntries(
     Object.entries(rawDraft.answers || {}).filter(([id, answer]) => validIds.has(id) && ["O", "X", "1", "2", "3", "4", "5"].includes(String(answer))),
   );
+  const restoredIndex = Math.max(0, Math.min(Number(rawDraft.index || 0), questions.length - 1));
+  if (!Object.keys(answers).length && restoredIndex === 0) return false;
   mockSession = {
     paperId: rawDraft.paperId,
     variant: Number(rawDraft.variant || 1),
     seed: rawDraft.seed || randomMockSeed(),
     questions,
     answers,
-    index: Math.max(0, Math.min(Number(rawDraft.index || 0), questions.length - 1)),
+    index: restoredIndex,
     submitted: false,
     recorded: false,
     createdAt: rawDraft.createdAt || rawDraft.updatedAt || new Date().toISOString(),
@@ -450,9 +452,10 @@ async function loadProgressFromCloud(user) {
     const localDraft = loadMockDraft();
     const cloudDraft = cloudState.mockDraft;
     const newestDraft = String(cloudDraft?.updatedAt || "") > String(localDraft?.updatedAt || "") ? cloudDraft : localDraft;
-    if (newestDraft) {
+    if (newestDraft && restoreMockDraft(newestDraft)) {
       localStorage.setItem(MOCK_DRAFT_KEY, JSON.stringify(newestDraft));
-      restoreMockDraft(newestDraft);
+    } else if (newestDraft) {
+      localStorage.removeItem(MOCK_DRAFT_KEY);
     }
     cloudReady = true;
     isCloudLoading = false;
@@ -1640,7 +1643,7 @@ function renderMockPicker() {
 function startMockExam(paperId) {
   if (!MOCK_EXAM) return;
   const variant = (mockFormCounters[paperId] || 0) + 1;
-  const seed = randomMockSeed();
+  const seed = `${randomMockSeed()}-${variant}`;
   const priorityIds = new Set(QUESTIONS.filter(isWrongQuestion).map((question) => question.id));
   const recentIds = recentMockQuestionIds(paperId);
   try {
@@ -1663,7 +1666,6 @@ function startMockExam(paperId) {
       restored: false,
     };
     rememberMockForm(paperId, seed, questions);
-    saveMockDraft();
     $("#mockPaperPicker").classList.add("hidden");
     $("#mockExamArea").classList.remove("hidden");
     renderMockExam();
@@ -1754,6 +1756,18 @@ function leaveMockExam() {
   $("#mock-exam")?.scrollIntoView({ block: "start", behavior: "auto" });
 }
 
+function replaceMockExam() {
+  if (!mockSession) return;
+  const paperId = mockSession.paperId;
+  const hasActivity = mockSession.index > 0 || Object.keys(mockSession.answers).length > 0;
+  if (!mockSession.submitted && hasActivity) {
+    if (!confirm("開始全新試卷會清除目前未完成的作答。確定重新抽題嗎？")) return;
+  }
+  clearMockDraft();
+  mockSession = null;
+  startMockExam(paperId);
+}
+
 function renderMockExam() {
   const area = $("#mockExamArea");
   if (!area || !mockSession || !MOCK_EXAM) return;
@@ -1773,7 +1787,7 @@ function renderMockExam() {
       </div>
       <div class="mock-session-status">
         <strong>${mockSession.submitted ? "已交卷" : `已答 ${answered} 題`}</strong>
-        <span>${mockSession.submitted ? `${paper.points} 分・建議 ${paper.duration} 分鐘` : "草稿已自動保存，可離開後再繼續"}</span>
+        <span>${mockSession.submitted ? `${paper.points} 分・建議 ${paper.duration} 分鐘` : "作答後自動保存，可離開後再繼續"}</span>
       </div>
     </header>
     ${mockSession.submitted ? mockScoreSummary(paper) : `
@@ -1783,7 +1797,7 @@ function renderMockExam() {
     <div class="mock-toolbar">
       <button id="mockBackToPickerBtn" type="button">返回選卷</button>
       ${!mockSession.submitted && remaining ? `<button id="mockNextUnansweredBtn" type="button">找下一題未答</button>` : ""}
-      ${mockSession.submitted ? `<button id="mockNewFormBtn" type="button">換一份新卷</button>` : ""}
+      <button id="mockNewFormBtn" type="button">換一份全新試卷</button>
     </div>
     <div class="mock-navigator" aria-label="題號導覽">
       ${mockSession.questions.map((item, index) => {
@@ -1859,7 +1873,7 @@ function renderMockExam() {
   });
   $("#mockSubmitBtn")?.addEventListener("click", submitMockExam);
   $("#mockBackToPickerBtn")?.addEventListener("click", leaveMockExam);
-  $("#mockNewFormBtn")?.addEventListener("click", () => startMockExam(mockSession.paperId));
+  $("#mockNewFormBtn")?.addEventListener("click", replaceMockExam);
 }
 
 function renderMockWorkspace() {
@@ -2430,7 +2444,8 @@ bindEvents();
 renderAll();
 renderLawSearch();
 initializeBookReader();
-restoreMockDraft(loadMockDraft());
+const savedMockDraft = loadMockDraft();
+if (!restoreMockDraft(savedMockDraft) && savedMockDraft) localStorage.removeItem(MOCK_DRAFT_KEY);
 renderMockWorkspace();
 initFirebaseSync();
 updateAuthControls();
